@@ -448,7 +448,12 @@
                 <div id="timerDisplay" style="display: none; background: #fff3cd; padding: 10px; border-radius: 8px; margin-bottom: 10px; text-align: center; font-weight: 600; color: #856404;">
                     ⏱️ Осталось времени: <span id="timeRemaining">30:00</span>
                 </div>
-                <div style="font-size: 14px; color: #666;">Подойдите к вопросу на расстояние 15м, чтобы разблокировать его</div>
+                <div style="font-size: 14px; color: #666; margin-bottom: 10px;">Подойдите к вопросу на расстояние 15м, чтобы разблокировать его</div>
+                
+                <button onclick="recalibrateCompass()" style="width: 100%; padding: 10px; background: #17a2b8; color: white; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; margin-bottom: 10px;">
+                    🧭 Откалибровать компас
+                </button>
+                
                 <div class="map-legend">
                     <div class="legend-item">
                         <div class="legend-dot locked"></div>
@@ -513,6 +518,7 @@
         let score = 0;
         let watchId = null;
         let currentHeading = 0;
+        let compassOffset = 0; // Calibration offset
         let mapStyle = 'street';
         let tileLayer = null;
         let currentDrawingTool = 'circle';
@@ -523,7 +529,7 @@
         let timerMinutes = 30;
         let timerInterval = null;
         let timeLeft = 0;
-        const UNLOCK_DISTANCE = 15; // meters
+        const UNLOCK_DISTANCE = 30; // meters
 
         // Disney cartoon quiz questions pool in Russian
         const questionPool = [
@@ -1810,12 +1816,63 @@
                 // For iOS: webkitCompassHeading gives true north
                 // For Android: alpha needs to be inverted
                 if (event.webkitCompassHeading) {
-                    currentHeading = heading;
+                    currentHeading = (heading + compassOffset) % 360;
                 } else {
-                    currentHeading = 360 - heading;
+                    currentHeading = (360 - heading + compassOffset) % 360;
                 }
                 
                 updateUserMarker();
+            }
+        }
+
+        // Recalibrate compass
+        function recalibrateCompass() {
+            // Request device orientation permission on iOS 13+
+            if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+                DeviceOrientationEvent.requestPermission()
+                    .then(permissionState => {
+                        if (permissionState === 'granted') {
+                            performCalibration();
+                        } else {
+                            alert('Разрешение на использование компаса отклонено');
+                        }
+                    })
+                    .catch(console.error);
+            } else {
+                performCalibration();
+            }
+        }
+
+        // Perform compass calibration
+        function performCalibration() {
+            const instructions = `
+📱 Калибровка компаса:
+
+1. Держите телефон плоско (параллельно земле)
+2. Медленно поверните телефон на 360° по часовой стрелке
+3. Или сделайте движение "восьмёрка" в воздухе
+
+После калибровки компас будет показывать более точное направление.
+
+Нажмите OK, чтобы продолжить.
+            `;
+            
+            alert(instructions);
+            
+            // Option to manually adjust offset
+            const adjust = confirm('Хотите вручную настроить направление?\n\nДА - Я настрою вручную\nНЕТ - Использовать автоматическую калибровку');
+            
+            if (adjust) {
+                const offset = prompt('Введите поправку в градусах (-180 до 180):\n\nНапример: если стрелка показывает на 90° правее, введите -90', '0');
+                if (offset !== null) {
+                    compassOffset = parseInt(offset) || 0;
+                    updateUserMarker();
+                    alert(`Компас откалиброван! Поправка: ${compassOffset}°`);
+                }
+            } else {
+                // Reset offset for auto calibration
+                compassOffset = 0;
+                alert('Компас сброшен. Пожалуйста, выполните движение восьмёркой для лучшей точности.');
             }
         }
 
@@ -2101,6 +2158,7 @@
             questionMarkers = [];
             score = 0;
             currentHeading = 0;
+            compassOffset = 0;
             selectedCenter = null;
             timerEnabled = false;
             timerMinutes = 30;
