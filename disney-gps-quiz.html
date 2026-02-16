@@ -302,6 +302,35 @@
             display: block;
             font-size: 13px;
         }
+
+        .tool-btn {
+            padding: 10px 15px;
+            background: white;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+
+        .tool-btn:hover {
+            border-color: #667eea;
+            background: #f0f4ff;
+        }
+
+        .tool-btn.active {
+            border-color: #667eea;
+            background: #667eea;
+            color: white;
+        }
+
+        .question-image {
+            width: 100%;
+            height: 200px;
+            object-fit: cover;
+            border-radius: 10px;
+            margin-bottom: 15px;
+        }
     </style>
 </head>
 <body>
@@ -334,22 +363,30 @@
         <!-- Map Selector Screen -->
         <div class="map-selector-screen">
             <div class="map-info">
-                <div style="font-weight: 600; margin-bottom: 10px;">🎯 Выберите область для вопросов</div>
+                <div style="font-weight: 600; margin-bottom: 10px;">🎯 Нарисуйте область для вопросов</div>
                 <div style="font-size: 14px; color: #666; margin-bottom: 10px;">
-                    Нажмите на карту, чтобы установить центр, затем перетащите ползунок для изменения радиуса
+                    Выберите инструмент и нарисуйте область на карте
                 </div>
             </div>
 
-            <div class="radius-control" style="background: #f0f4ff; padding: 15px; border-radius: 10px; margin-bottom: 15px;">
-                <label for="radiusSlider" style="display: block; margin-bottom: 10px; font-weight: 600;">
-                    Радиус: <span id="radiusValue">500</span> метров
-                </label>
-                <input type="range" id="radiusSlider" min="50" max="2000" value="500" 
-                    style="width: 100%; height: 8px; border-radius: 5px; background: #ddd; outline: none;"
-                    oninput="updateCircleRadius(this.value)">
-                <div style="display: flex; justify-content: space-between; font-size: 12px; color: #666; margin-top: 5px;">
-                    <span>50м</span>
-                    <span>2000м</span>
+            <div class="drawing-tools" style="background: #f0f4ff; padding: 15px; border-radius: 10px; margin-bottom: 15px;">
+                <div style="font-weight: 600; margin-bottom: 10px;">Инструменты рисования:</div>
+                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                    <button onclick="selectDrawingTool('circle')" id="tool-circle" class="tool-btn active">
+                        ⭕ Круг
+                    </button>
+                    <button onclick="selectDrawingTool('rectangle')" id="tool-rectangle" class="tool-btn">
+                        ⬜ Прямоугольник
+                    </button>
+                    <button onclick="selectDrawingTool('polygon')" id="tool-polygon" class="tool-btn">
+                        🔶 Свободная форма
+                    </button>
+                    <button onclick="clearDrawing()" class="tool-btn" style="background: #f44336;">
+                        🗑️ Очистить
+                    </button>
+                </div>
+                <div id="drawingHint" style="margin-top: 10px; font-size: 13px; color: #666;">
+                    Нажмите на карту, чтобы начать рисовать круг
                 </div>
             </div>
             
@@ -363,7 +400,7 @@
         <div class="map-screen">
             <div class="map-info">
                 <div style="font-weight: 600; margin-bottom: 10px;">🗺️ Карта вопросов</div>
-                <div style="font-size: 14px; color: #666;">Подойдите к вопросу на расстояние 5м, чтобы разблокировать его</div>
+                <div style="font-size: 14px; color: #666;">Подойдите к вопросу на расстояние 15м, чтобы разблокировать его</div>
                 <div class="map-legend">
                     <div class="legend-item">
                         <div class="legend-dot locked"></div>
@@ -430,84 +467,103 @@
         let currentHeading = 0;
         let mapStyle = 'street';
         let tileLayer = null;
-        const UNLOCK_DISTANCE = 5; // meters
+        let currentDrawingTool = 'circle';
+        let drawnShape = null;
+        let isDrawing = false;
+        let drawingPoints = [];
+        const UNLOCK_DISTANCE = 15; // meters
 
         // Disney cartoon quiz questions pool in Russian
         const questionPool = [
             {
                 question: "Как зовут отца Симбы в 'Короле Льве'?",
                 options: ["Шрам", "Муфаса", "Рафики"],
-                correct: 1
+                correct: 1,
+                image: "https://images.unsplash.com/photo-1556103255-4443dbae8e5a?w=800&auto=format&fit=crop"
             },
             {
                 question: "У какой диснеевской принцессы есть тигр по имени Раджа?",
                 options: ["Жасмин", "Белль", "Ариэль"],
-                correct: 0
+                correct: 0,
+                image: "https://images.unsplash.com/photo-1568605117036-5fe5e7bab0b7?w=800&auto=format&fit=crop"
             },
             {
                 question: "Какое животное Балу из 'Книги джунглей'?",
                 options: ["Пантера", "Медведь", "Слон"],
-                correct: 1
+                correct: 1,
+                image: "https://images.unsplash.com/photo-1589656966895-2f33e7653819?w=800&auto=format&fit=crop"
             },
             {
                 question: "Как зовут сестру Анны в 'Холодном сердце'?",
                 options: ["Эльза", "Рапунцель", "Моана"],
-                correct: 0
+                correct: 0,
+                image: "https://images.unsplash.com/photo-1483381719261-1d7f82f8c364?w=800&auto=format&fit=crop"
             },
             {
                 question: "Что означает 'Акуна Матата'?",
                 options: ["Доброе утро", "Нет проблем", "Спасибо"],
-                correct: 1
+                correct: 1,
+                image: "https://images.unsplash.com/photo-1516426122078-c23e76319801?w=800&auto=format&fit=crop"
             },
             {
                 question: "В каком диснеевском фильме звучит песня 'Целый новый мир'?",
                 options: ["Аладдин", "Красавица и Чудовище", "Мулан"],
-                correct: 0
+                correct: 0,
+                image: "https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=800&auto=format&fit=crop"
             },
             {
                 question: "Как зовут друга-рыбку Ариэль в 'Русалочке'?",
                 options: ["Себастьян", "Флаундер", "Скаттл"],
-                correct: 1
+                correct: 1,
+                image: "https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=800&auto=format&fit=crop"
             },
             {
                 question: "Как зовут соседа Энди в 'Истории игрушек'?",
                 options: ["Сид", "Рекс", "Вуди"],
-                correct: 0
+                correct: 0,
+                image: "https://images.unsplash.com/photo-1587731556938-38755b4803a6?w=800&auto=format&fit=crop"
             },
             {
                 question: "Какое животное Тимон из 'Короля Льва'?",
                 options: ["Бородавочник", "Сурикат", "Гиена"],
-                correct: 1
+                correct: 1,
+                image: "https://images.unsplash.com/photo-1535930891776-0c2dfb7fda1a?w=800&auto=format&fit=crop"
             },
             {
                 question: "Какой персонаж Disney говорит 'Просто плыви дальше'?",
                 options: ["Немо", "Дори", "Марлин"],
-                correct: 1
+                correct: 1,
+                image: "https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=800&auto=format&fit=crop"
             },
             {
                 question: "Как зовут дракона-спутника Мулан?",
                 options: ["Мушу", "Кри-Ки", "Хан"],
-                correct: 0
+                correct: 0,
+                image: "https://images.unsplash.com/photo-1451772741724-d20990422508?w=800&auto=format&fit=crop"
             },
             {
                 question: "Как зовут отца Белль в 'Красавице и Чудовище'?",
                 options: ["Гастон", "Морис", "Люмьер"],
-                correct: 1
+                correct: 1,
+                image: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=800&auto=format&fit=crop"
             },
             {
                 question: "Во что фея-крёстная превращает карету Золушки?",
                 options: ["Яблоко", "Тыква", "Арбуз"],
-                correct: 1
+                correct: 1,
+                image: "https://images.unsplash.com/photo-1570043849279-7d0ca4675682?w=800&auto=format&fit=crop"
             },
             {
                 question: "Какой гном в 'Белоснежке' носит очки?",
                 options: ["Док", "Ворчун", "Скромник"],
-                correct: 0
+                correct: 0,
+                image: "https://images.unsplash.com/photo-1509310982748-a9f5a0a00c7f?w=800&auto=format&fit=crop"
             },
             {
                 question: "Как зовут хамелеона Рапунцель в 'Рапунцель'?",
                 options: ["Флинн", "Паскаль", "Максимус"],
-                correct: 1
+                correct: 1,
+                image: "https://images.unsplash.com/photo-1576859898415-f53858c0de0a?w=800&auto=format&fit=crop"
             }
         ];
 
@@ -592,57 +648,201 @@
                 })
             }).addTo(selectorMap);
 
-            // Set default selected center to user location
-            selectedCenter = {lat: userLocation.lat, lng: userLocation.lng};
-            radius = 500;
+            // Setup drawing interaction
+            setupDrawing();
+        }
 
-            // Add initial circle
-            selectionCircle = L.circle([selectedCenter.lat, selectedCenter.lng], {
-                radius: radius,
-                color: '#667eea',
-                fillColor: '#667eea',
-                fillOpacity: 0.2,
-                weight: 3
-            }).addTo(selectorMap);
+        // Select drawing tool
+        function selectDrawingTool(tool) {
+            currentDrawingTool = tool;
+            
+            // Update button states
+            document.querySelectorAll('.tool-btn').forEach(btn => btn.classList.remove('active'));
+            document.getElementById('tool-' + tool).classList.add('active');
+            
+            // Update hint
+            const hints = {
+                circle: 'Нажмите на карту, чтобы начать рисовать круг',
+                rectangle: 'Нажмите на карту, чтобы начать рисовать прямоугольник',
+                polygon: 'Нажмите на карту, чтобы добавить точки. Двойной клик для завершения'
+            };
+            document.getElementById('drawingHint').textContent = hints[tool];
+            
+            // Clear previous drawing state
+            isDrawing = false;
+            drawingPoints = [];
+        }
 
-            // Add center marker
-            centerMarker = L.marker([selectedCenter.lat, selectedCenter.lng], {
-                icon: L.divIcon({
-                    className: 'center-marker',
-                    html: '<div style="background: #ff5722; width: 20px; height: 20px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.3);"></div>',
-                    iconSize: [20, 20],
-                    iconAnchor: [10, 10]
-                }),
-                draggable: true
-            }).addTo(selectorMap);
+        // Clear drawn shape
+        function clearDrawing() {
+            if (drawnShape) {
+                selectorMap.removeLayer(drawnShape);
+                drawnShape = null;
+                selectedCenter = null;
+            }
+            isDrawing = false;
+            drawingPoints = [];
+        }
 
-            // Update circle when marker is dragged
-            centerMarker.on('drag', function(e) {
-                selectedCenter = e.target.getLatLng();
-                selectionCircle.setLatLng(selectedCenter);
+        // Setup drawing interaction
+        function setupDrawing() {
+            let startPoint = null;
+            let tempShape = null;
+
+            selectorMap.on('click', function(e) {
+                if (currentDrawingTool === 'circle') {
+                    if (!isDrawing) {
+                        // First click - set center
+                        startPoint = e.latlng;
+                        isDrawing = true;
+                        clearDrawing();
+                    }
+                } else if (currentDrawingTool === 'rectangle') {
+                    if (!isDrawing) {
+                        // First click - set corner
+                        startPoint = e.latlng;
+                        isDrawing = true;
+                        clearDrawing();
+                    }
+                } else if (currentDrawingTool === 'polygon') {
+                    // Add point to polygon
+                    drawingPoints.push(e.latlng);
+                    
+                    if (drawingPoints.length === 1) {
+                        isDrawing = true;
+                        clearDrawing();
+                    }
+                    
+                    // Draw temporary polygon
+                    if (tempShape) {
+                        selectorMap.removeLayer(tempShape);
+                    }
+                    
+                    if (drawingPoints.length >= 2) {
+                        tempShape = L.polygon(drawingPoints, {
+                            color: '#667eea',
+                            fillColor: '#667eea',
+                            fillOpacity: 0.2,
+                            weight: 3
+                        }).addTo(selectorMap);
+                    }
+                }
             });
 
-            // Allow clicking on map to move center
-            selectorMap.on('click', function(e) {
-                selectedCenter = e.latlng;
-                centerMarker.setLatLng(selectedCenter);
-                selectionCircle.setLatLng(selectedCenter);
+            selectorMap.on('dblclick', function(e) {
+                L.DomEvent.stop(e);
+                
+                if (currentDrawingTool === 'polygon' && drawingPoints.length >= 3) {
+                    // Finish polygon
+                    if (tempShape) {
+                        selectorMap.removeLayer(tempShape);
+                    }
+                    
+                    drawnShape = L.polygon(drawingPoints, {
+                        color: '#667eea',
+                        fillColor: '#667eea',
+                        fillOpacity: 0.2,
+                        weight: 3
+                    }).addTo(selectorMap);
+                    
+                    // Calculate center
+                    const bounds = drawnShape.getBounds();
+                    selectedCenter = bounds.getCenter();
+                    
+                    isDrawing = false;
+                    drawingPoints = [];
+                }
+            });
+
+            selectorMap.on('mousemove', function(e) {
+                if (!isDrawing || !startPoint) return;
+
+                if (currentDrawingTool === 'circle') {
+                    const radius = startPoint.distanceTo(e.latlng);
+                    
+                    if (tempShape) {
+                        selectorMap.removeLayer(tempShape);
+                    }
+                    
+                    tempShape = L.circle(startPoint, {
+                        radius: radius,
+                        color: '#667eea',
+                        fillColor: '#667eea',
+                        fillOpacity: 0.2,
+                        weight: 3
+                    }).addTo(selectorMap);
+                    
+                } else if (currentDrawingTool === 'rectangle') {
+                    if (tempShape) {
+                        selectorMap.removeLayer(tempShape);
+                    }
+                    
+                    const bounds = L.latLngBounds(startPoint, e.latlng);
+                    tempShape = L.rectangle(bounds, {
+                        color: '#667eea',
+                        fillColor: '#667eea',
+                        fillOpacity: 0.2,
+                        weight: 3
+                    }).addTo(selectorMap);
+                }
+            });
+
+            selectorMap.on('mouseup', function(e) {
+                if (!isDrawing || !startPoint) return;
+
+                if (currentDrawingTool === 'circle') {
+                    const radius = startPoint.distanceTo(e.latlng);
+                    
+                    if (tempShape) {
+                        selectorMap.removeLayer(tempShape);
+                    }
+                    
+                    drawnShape = L.circle(startPoint, {
+                        radius: radius,
+                        color: '#667eea',
+                        fillColor: '#667eea',
+                        fillOpacity: 0.2,
+                        weight: 3
+                    }).addTo(selectorMap);
+                    
+                    selectedCenter = startPoint;
+                    isDrawing = false;
+                    startPoint = null;
+                    
+                } else if (currentDrawingTool === 'rectangle') {
+                    if (tempShape) {
+                        selectorMap.removeLayer(tempShape);
+                    }
+                    
+                    const bounds = L.latLngBounds(startPoint, e.latlng);
+                    drawnShape = L.rectangle(bounds, {
+                        color: '#667eea',
+                        fillColor: '#667eea',
+                        fillOpacity: 0.2,
+                        weight: 3
+                    }).addTo(selectorMap);
+                    
+                    selectedCenter = bounds.getCenter();
+                    isDrawing = false;
+                    startPoint = null;
+                }
             });
         }
 
-        // Update circle radius from slider
+        // Update circle radius from slider (removed - no longer needed)
         function updateCircleRadius(value) {
-            radius = parseInt(value);
-            document.getElementById('radiusValue').textContent = radius;
-            if (selectionCircle) {
-                selectionCircle.setRadius(radius);
-            }
+            // This function is no longer used but kept for compatibility
         }
 
         // Confirm area selection and start game
         function confirmAreaSelection() {
+            if (!drawnShape) {
+                alert('Пожалуйста, нарисуйте область на карте');
+                return;
+            }
+
             if (!selectedCenter) {
-                alert('Пожалуйста, выберите центр области на карте');
+                alert('Ошибка: центр области не определён');
                 return;
             }
 
@@ -774,14 +974,26 @@
                 questionMarkers.push(marker);
             });
 
-            // Draw selection area circle
-            L.circle([selectedCenter.lat, selectedCenter.lng], {
-                radius: radius,
-                color: '#667eea',
-                fillColor: '#667eea',
-                fillOpacity: 0.1,
-                weight: 2
-            }).addTo(map);
+            // Draw the selected area shape on the game map
+            if (drawnShape) {
+                const shapeOptions = {
+                    color: '#667eea',
+                    fillColor: '#667eea',
+                    fillOpacity: 0.1,
+                    weight: 2
+                };
+
+                if (currentDrawingTool === 'circle') {
+                    L.circle([selectedCenter.lat, selectedCenter.lng], {
+                        radius: drawnShape.getRadius(),
+                        ...shapeOptions
+                    }).addTo(map);
+                } else if (currentDrawingTool === 'rectangle') {
+                    L.rectangle(drawnShape.getBounds(), shapeOptions).addTo(map);
+                } else if (currentDrawingTool === 'polygon') {
+                    L.polygon(drawnShape.getLatLngs()[0], shapeOptions).addTo(map);
+                }
+            }
 
             // Mark the center of selection area
             L.marker([selectedCenter.lat, selectedCenter.lng], {
@@ -899,10 +1111,15 @@
                 </div>
             `;
             
-            document.getElementById('questionText').textContent = q.question;
+            // Create question card with image
+            const questionCard = document.querySelector('.question-card');
+            questionCard.innerHTML = `
+                <img src="${q.image}" alt="Вопрос ${index + 1}" class="question-image" onerror="this.style.display='none'">
+                <div class="question-text">${q.question}</div>
+                <div class="options" id="optionsContainer"></div>
+            `;
             
             const optionsContainer = document.getElementById('optionsContainer');
-            optionsContainer.innerHTML = '';
             
             q.options.forEach((option, optIndex) => {
                 const optionDiv = document.createElement('div');
@@ -958,21 +1175,61 @@
             return shuffled.slice(0, count).map(q => ({...q}));
         }
 
-        // Generate random location within radius
+        // Generate random location within radius or drawn shape
         function getRandomLocationInRadius(center, radiusInMeters) {
-            const radiusInDegrees = radiusInMeters / 111320;
+            if (!drawnShape) {
+                // Fallback to circle if no shape drawn
+                radiusInMeters = 500;
+            }
             
-            const u = Math.random();
-            const v = Math.random();
-            const w = radiusInDegrees * Math.sqrt(u);
-            const t = 2 * Math.PI * v;
-            const x = w * Math.cos(t);
-            const y = w * Math.sin(t);
+            // Get bounds of the drawn shape
+            const bounds = drawnShape ? drawnShape.getBounds() : null;
             
-            return {
-                lat: center.lat + y,
-                lng: center.lng + x / Math.cos(center.lat * Math.PI / 180)
-            };
+            if (bounds) {
+                // Generate random point within bounds
+                let point;
+                let attempts = 0;
+                const maxAttempts = 100;
+                
+                do {
+                    const lat = bounds.getSouth() + Math.random() * (bounds.getNorth() - bounds.getSouth());
+                    const lng = bounds.getWest() + Math.random() * (bounds.getEast() - bounds.getWest());
+                    point = L.latLng(lat, lng);
+                    attempts++;
+                    
+                    // Check if point is inside the shape
+                    if (currentDrawingTool === 'circle') {
+                        const distance = center.distanceTo ? 
+                            L.latLng(center).distanceTo(point) : 
+                            L.latLng(center.lat, center.lng).distanceTo(point);
+                        if (distance <= drawnShape.getRadius()) {
+                            return {lat: point.lat, lng: point.lng};
+                        }
+                    } else {
+                        // For rectangle and polygon, check if point is in bounds
+                        // Simple bounds check for rectangle/polygon
+                        return {lat: point.lat, lng: point.lng};
+                    }
+                } while (attempts < maxAttempts);
+                
+                // Fallback to center if couldn't find point
+                return {lat: center.lat, lng: center.lng};
+            } else {
+                // Original circle logic as fallback
+                const radiusInDegrees = radiusInMeters / 111320;
+                
+                const u = Math.random();
+                const v = Math.random();
+                const w = radiusInDegrees * Math.sqrt(u);
+                const t = 2 * Math.PI * v;
+                const x = w * Math.cos(t);
+                const y = w * Math.sin(t);
+                
+                return {
+                    lat: center.lat + y,
+                    lng: center.lng + x / Math.cos(center.lat * Math.PI / 180)
+                };
+            }
         }
 
         // Calculate distance between two points
