@@ -417,21 +417,12 @@
             <div class="drawing-tools" style="background: #f0f4ff; padding: 15px; border-radius: 10px; margin-bottom: 15px;">
                 <div style="font-weight: 600; margin-bottom: 10px;">Инструменты рисования:</div>
                 <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                    <button onclick="selectDrawingTool('circle')" id="tool-circle" class="tool-btn active">
-                        ⭕ Круг
-                    </button>
-                    <button onclick="selectDrawingTool('rectangle')" id="tool-rectangle" class="tool-btn">
-                        ⬜ Прямоугольник
-                    </button>
-                    <button onclick="selectDrawingTool('polygon')" id="tool-polygon" class="tool-btn">
-                        🔶 Свободная форма
-                    </button>
-                    <button onclick="clearDrawing()" class="tool-btn" style="background: #f44336;">
+                    <button onclick="clearDrawing()" class="tool-btn" style="background: #f44336; color: white; border-color: #f44336;">
                         🗑️ Очистить
                     </button>
                 </div>
                 <div id="drawingHint" style="margin-top: 10px; font-size: 13px; color: #666;">
-                    Нажмите на карту, чтобы начать рисовать круг
+                    Нажимайте на карту для добавления точек. Двойной клик для завершения
                 </div>
             </div>
             
@@ -521,7 +512,7 @@
         let compassOffset = 0; // Calibration offset
         let mapStyle = 'street';
         let tileLayer = null;
-        let currentDrawingTool = 'circle';
+        let currentDrawingTool = 'polygon'; // Only polygon is available
         let drawnShape = null;
         let isDrawing = false;
         let drawingPoints = [];
@@ -1340,27 +1331,6 @@
             setupDrawing();
         }
 
-        // Select drawing tool
-        function selectDrawingTool(tool) {
-            currentDrawingTool = tool;
-            
-            // Update button states
-            document.querySelectorAll('.tool-btn').forEach(btn => btn.classList.remove('active'));
-            document.getElementById('tool-' + tool).classList.add('active');
-            
-            // Update hint
-            const hints = {
-                circle: 'Нажмите и удерживайте, затем перетащите для создания круга',
-                rectangle: 'Нажмите и удерживайте, затем перетащите для создания прямоугольника',
-                polygon: 'Нажимайте на карту для добавления точек. Двойной клик для завершения'
-            };
-            document.getElementById('drawingHint').textContent = hints[tool];
-            
-            // Clear previous drawing state
-            isDrawing = false;
-            drawingPoints = [];
-        }
-
         // Clear drawn shape
         function clearDrawing() {
             if (drawnShape) {
@@ -1370,153 +1340,15 @@
             }
             isDrawing = false;
             drawingPoints = [];
+            document.getElementById('drawingHint').textContent = 'Нажимайте на карту для добавления точек. Двойной клик для завершения';
         }
 
         // Setup drawing interaction
         function setupDrawing() {
-            let startPoint = null;
             let tempShape = null;
-            let isMouseDown = false;
-
-            // Handle both mouse and touch events
-            function handleStart(e) {
-                const latlng = e.latlng;
-                
-                if (currentDrawingTool === 'polygon') {
-                    return; // Polygon uses click events
-                }
-                
-                isMouseDown = true;
-                startPoint = latlng;
-                isDrawing = true;
-                
-                if (drawnShape) {
-                    selectorMap.removeLayer(drawnShape);
-                    drawnShape = null;
-                }
-                
-                if (tempShape) {
-                    selectorMap.removeLayer(tempShape);
-                    tempShape = null;
-                }
-            }
-
-            function handleMove(e) {
-                if (!isMouseDown || !startPoint) return;
-                
-                const latlng = e.latlng;
-
-                if (currentDrawingTool === 'circle') {
-                    const radius = startPoint.distanceTo(latlng);
-                    
-                    if (tempShape) {
-                        selectorMap.removeLayer(tempShape);
-                    }
-                    
-                    tempShape = L.circle(startPoint, {
-                        radius: radius,
-                        color: '#667eea',
-                        fillColor: '#667eea',
-                        fillOpacity: 0.2,
-                        weight: 3
-                    }).addTo(selectorMap);
-                    
-                } else if (currentDrawingTool === 'rectangle') {
-                    if (tempShape) {
-                        selectorMap.removeLayer(tempShape);
-                    }
-                    
-                    const bounds = L.latLngBounds(startPoint, latlng);
-                    tempShape = L.rectangle(bounds, {
-                        color: '#667eea',
-                        fillColor: '#667eea',
-                        fillOpacity: 0.2,
-                        weight: 3
-                    }).addTo(selectorMap);
-                }
-            }
-
-            function handleEnd(e) {
-                if (!isMouseDown || !startPoint) return;
-                
-                const latlng = e.latlng;
-                isMouseDown = false;
-
-                if (currentDrawingTool === 'circle') {
-                    const radius = startPoint.distanceTo(latlng);
-                    
-                    if (radius < 10) {
-                        // Too small, ignore
-                        if (tempShape) {
-                            selectorMap.removeLayer(tempShape);
-                            tempShape = null;
-                        }
-                        isDrawing = false;
-                        startPoint = null;
-                        return;
-                    }
-                    
-                    if (tempShape) {
-                        selectorMap.removeLayer(tempShape);
-                    }
-                    
-                    drawnShape = L.circle(startPoint, {
-                        radius: radius,
-                        color: '#667eea',
-                        fillColor: '#667eea',
-                        fillOpacity: 0.2,
-                        weight: 3
-                    }).addTo(selectorMap);
-                    
-                    selectedCenter = startPoint;
-                    isDrawing = false;
-                    startPoint = null;
-                    
-                    document.getElementById('drawingHint').textContent = '✓ Круг создан! Можете подтвердить или нарисовать заново';
-                    
-                } else if (currentDrawingTool === 'rectangle') {
-                    const bounds = L.latLngBounds(startPoint, latlng);
-                    
-                    // Check if rectangle is too small
-                    const size = startPoint.distanceTo(latlng);
-                    if (size < 10) {
-                        if (tempShape) {
-                            selectorMap.removeLayer(tempShape);
-                            tempShape = null;
-                        }
-                        isDrawing = false;
-                        startPoint = null;
-                        return;
-                    }
-                    
-                    if (tempShape) {
-                        selectorMap.removeLayer(tempShape);
-                    }
-                    
-                    drawnShape = L.rectangle(bounds, {
-                        color: '#667eea',
-                        fillColor: '#667eea',
-                        fillOpacity: 0.2,
-                        weight: 3
-                    }).addTo(selectorMap);
-                    
-                    selectedCenter = bounds.getCenter();
-                    isDrawing = false;
-                    startPoint = null;
-                    
-                    document.getElementById('drawingHint').textContent = '✓ Прямоугольник создан! Можете подтвердить или нарисовать заново';
-                }
-            }
-
-            // Mouse events
-            selectorMap.on('mousedown', handleStart);
-            selectorMap.on('mousemove', handleMove);
-            selectorMap.on('mouseup', handleEnd);
 
             // Polygon uses click events
             selectorMap.on('click', function(e) {
-                if (currentDrawingTool !== 'polygon') return;
-                
                 // Add point to polygon
                 drawingPoints.push(e.latlng);
                 
@@ -1554,7 +1386,7 @@
             selectorMap.on('dblclick', function(e) {
                 L.DomEvent.stop(e);
                 
-                if (currentDrawingTool === 'polygon' && drawingPoints.length >= 3) {
+                if (drawingPoints.length >= 3) {
                     // Finish polygon
                     if (tempShape) {
                         selectorMap.removeLayer(tempShape);
@@ -1738,16 +1570,8 @@
                     weight: 2
                 };
 
-                if (currentDrawingTool === 'circle') {
-                    L.circle([selectedCenter.lat, selectedCenter.lng], {
-                        radius: drawnShape.getRadius(),
-                        ...shapeOptions
-                    }).addTo(map);
-                } else if (currentDrawingTool === 'rectangle') {
-                    L.rectangle(drawnShape.getBounds(), shapeOptions).addTo(map);
-                } else if (currentDrawingTool === 'polygon') {
-                    L.polygon(drawnShape.getLatLngs()[0], shapeOptions).addTo(map);
-                }
+                // Always polygon since we removed circle and rectangle
+                L.polygon(drawnShape.getLatLngs()[0], shapeOptions).addTo(map);
             }
 
             // Mark the center of selection area
