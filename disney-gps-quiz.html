@@ -621,7 +621,9 @@
                 selectorMap.remove();
             }
 
-            selectorMap = L.map('selectorMap').setView([userLocation.lat, userLocation.lng], 15);
+            selectorMap = L.map('selectorMap', {
+                doubleClickZoom: false  // Disable double-click zoom for polygon drawing
+            }).setView([userLocation.lat, userLocation.lng], 15);
             
             // Add tile layer based on selected style
             const tileUrls = {
@@ -662,9 +664,9 @@
             
             // Update hint
             const hints = {
-                circle: 'Нажмите на карту, чтобы начать рисовать круг',
-                rectangle: 'Нажмите на карту, чтобы начать рисовать прямоугольник',
-                polygon: 'Нажмите на карту, чтобы добавить точки. Двойной клик для завершения'
+                circle: 'Нажмите и удерживайте, затем перетащите для создания круга',
+                rectangle: 'Нажмите и удерживайте, затем перетащите для создания прямоугольника',
+                polygon: 'Нажимайте на карту для добавления точек. Двойной клик для завершения'
             };
             document.getElementById('drawingHint').textContent = hints[tool];
             
@@ -688,29 +690,34 @@
         function setupDrawing() {
             let startPoint = null;
             let tempShape = null;
+            let isMouseDown = false;
+
+            selectorMap.on('mousedown', function(e) {
+                if (currentDrawingTool === 'polygon') {
+                    return; // Polygon uses click events
+                }
+                
+                isMouseDown = true;
+                startPoint = e.latlng;
+                isDrawing = true;
+                
+                if (drawnShape) {
+                    selectorMap.removeLayer(drawnShape);
+                    drawnShape = null;
+                }
+            });
 
             selectorMap.on('click', function(e) {
-                if (currentDrawingTool === 'circle') {
-                    if (!isDrawing) {
-                        // First click - set center
-                        startPoint = e.latlng;
-                        isDrawing = true;
-                        clearDrawing();
-                    }
-                } else if (currentDrawingTool === 'rectangle') {
-                    if (!isDrawing) {
-                        // First click - set corner
-                        startPoint = e.latlng;
-                        isDrawing = true;
-                        clearDrawing();
-                    }
-                } else if (currentDrawingTool === 'polygon') {
+                if (currentDrawingTool === 'polygon') {
                     // Add point to polygon
                     drawingPoints.push(e.latlng);
                     
                     if (drawingPoints.length === 1) {
                         isDrawing = true;
-                        clearDrawing();
+                        if (drawnShape) {
+                            selectorMap.removeLayer(drawnShape);
+                            drawnShape = null;
+                        }
                     }
                     
                     // Draw temporary polygon
@@ -724,6 +731,14 @@
                             fillColor: '#667eea',
                             fillOpacity: 0.2,
                             weight: 3
+                        }).addTo(selectorMap);
+                    } else if (drawingPoints.length === 1) {
+                        // Show a marker for the first point
+                        tempShape = L.circleMarker(drawingPoints[0], {
+                            radius: 5,
+                            color: '#667eea',
+                            fillColor: '#667eea',
+                            fillOpacity: 0.5
                         }).addTo(selectorMap);
                     }
                 }
@@ -751,11 +766,13 @@
                     
                     isDrawing = false;
                     drawingPoints = [];
+                    
+                    document.getElementById('drawingHint').textContent = '✓ Форма создана! Можете подтвердить или нарисовать заново';
                 }
             });
 
             selectorMap.on('mousemove', function(e) {
-                if (!isDrawing || !startPoint) return;
+                if (!isMouseDown || !startPoint) return;
 
                 if (currentDrawingTool === 'circle') {
                     const radius = startPoint.distanceTo(e.latlng);
@@ -788,10 +805,21 @@
             });
 
             selectorMap.on('mouseup', function(e) {
-                if (!isDrawing || !startPoint) return;
+                if (!isMouseDown || !startPoint) return;
+                isMouseDown = false;
 
                 if (currentDrawingTool === 'circle') {
                     const radius = startPoint.distanceTo(e.latlng);
+                    
+                    if (radius < 10) {
+                        // Too small, ignore
+                        if (tempShape) {
+                            selectorMap.removeLayer(tempShape);
+                            tempShape = null;
+                        }
+                        isDrawing = false;
+                        return;
+                    }
                     
                     if (tempShape) {
                         selectorMap.removeLayer(tempShape);
@@ -809,12 +837,22 @@
                     isDrawing = false;
                     startPoint = null;
                     
+                    document.getElementById('drawingHint').textContent = '✓ Круг создан! Можете подтвердить или нарисовать заново';
+                    
                 } else if (currentDrawingTool === 'rectangle') {
                     if (tempShape) {
                         selectorMap.removeLayer(tempShape);
                     }
                     
                     const bounds = L.latLngBounds(startPoint, e.latlng);
+                    
+                    // Check if rectangle is too small
+                    const size = startPoint.distanceTo(e.latlng);
+                    if (size < 10) {
+                        isDrawing = false;
+                        return;
+                    }
+                    
                     drawnShape = L.rectangle(bounds, {
                         color: '#667eea',
                         fillColor: '#667eea',
@@ -825,6 +863,8 @@
                     selectedCenter = bounds.getCenter();
                     isDrawing = false;
                     startPoint = null;
+                    
+                    document.getElementById('drawingHint').textContent = '✓ Прямоугольник создан! Можете подтвердить или нарисовать заново';
                 }
             });
         }
