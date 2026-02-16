@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Disney GPS Quiz Game</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 500px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+
+        h1 {
+            color: #667eea;
+            text-align: center;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+
+        .setup-screen, .game-screen, .results-screen {
+            display: none;
+        }
+
+        .setup-screen.active, .game-screen.active, .results-screen.active {
+            display: block;
+        }
+
+        .input-group {
+            margin-bottom: 25px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 600;
+        }
+
+        input[type="number"] {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+
+        input[type="number"]:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .location-status {
+            background: #f0f4ff;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            text-align: center;
+            color: #667eea;
+            font-size: 14px;
+        }
+
+        .question-progress {
+            text-align: center;
+            margin-bottom: 20px;
+            color: #666;
+            font-weight: 600;
+        }
+
+        .question-card {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 15px;
+            margin-bottom: 25px;
+        }
+
+        .question-text {
+            font-size: 18px;
+            color: #333;
+            margin-bottom: 20px;
+            font-weight: 600;
+            line-height: 1.5;
+        }
+
+        .location-info {
+            background: #e3f2fd;
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            font-size: 13px;
+            color: #1976d2;
+        }
+
+        .distance {
+            font-weight: 600;
+        }
+
+        .options {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .option {
+            padding: 15px;
+            background: white;
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 16px;
+        }
+
+        .option:hover {
+            border-color: #667eea;
+            background: #f0f4ff;
+        }
+
+        .option.selected {
+            border-color: #667eea;
+            background: #667eea;
+            color: white;
+        }
+
+        .option.correct {
+            border-color: #4caf50;
+            background: #4caf50;
+            color: white;
+        }
+
+        .option.incorrect {
+            border-color: #f44336;
+            background: #f44336;
+            color: white;
+        }
+
+        .option.disabled {
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+
+        .next-btn {
+            margin-top: 20px;
+            display: none;
+        }
+
+        .next-btn.show {
+            display: block;
+        }
+
+        .results-summary {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .score {
+            font-size: 48px;
+            color: #667eea;
+            font-weight: bold;
+            margin: 20px 0;
+        }
+
+        .score-text {
+            font-size: 18px;
+            color: #666;
+            margin-bottom: 10px;
+        }
+
+        .feedback {
+            font-size: 16px;
+            color: #333;
+            margin-top: 15px;
+        }
+
+        .results-list {
+            margin-top: 30px;
+        }
+
+        .result-item {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+        }
+
+        .result-item.correct {
+            border-left: 4px solid #4caf50;
+        }
+
+        .result-item.incorrect {
+            border-left: 4px solid #f44336;
+        }
+
+        .result-question {
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #333;
+        }
+
+        .result-answer {
+            font-size: 14px;
+            color: #666;
+        }
+
+        .error {
+            background: #ffebee;
+            color: #c62828;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #667eea;
+        }
+
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🏰 Disney GPS Quiz</h1>
+        <p class="subtitle">Adventure awaits around you!</p>
+
+        <!-- Setup Screen -->
+        <div class="setup-screen active">
+            <div class="location-status" id="locationStatus">
+                📍 Getting your location...
+            </div>
+            
+            <div class="input-group">
+                <label for="radius">Search Radius (meters)</label>
+                <input type="number" id="radius" min="10" max="10000" value="500" placeholder="Enter radius in meters">
+                <small style="color: #666; margin-top: 5px; display: block;">
+                    Questions will be placed randomly within this radius from your current location
+                </small>
+            </div>
+
+            <button class="btn" id="startBtn" onclick="startGame()">Start Quiz Adventure!</button>
+        </div>
+
+        <!-- Game Screen -->
+        <div class="game-screen">
+            <div class="question-progress" id="progress">Question 1 of 5</div>
+            
+            <div class="question-card">
+                <div class="location-info" id="questionLocation"></div>
+                <div class="question-text" id="questionText"></div>
+                <div class="options" id="optionsContainer"></div>
+            </div>
+
+            <button class="btn next-btn" id="nextBtn" onclick="nextQuestion()">Next Question</button>
+        </div>
+
+        <!-- Results Screen -->
+        <div class="results-screen">
+            <div class="results-summary">
+                <h2>🎉 Quiz Complete!</h2>
+                <div class="score" id="finalScore">0/5</div>
+                <div class="score-text">Questions Correct</div>
+                <div class="feedback" id="feedback"></div>
+            </div>
+
+            <div class="results-list" id="resultsList"></div>
+
+            <button class="btn" onclick="resetGame()">Play Again</button>
+        </div>
+    </div>
+
+    <script>
+        // Game state
+        let userLocation = null;
+        let radius = 500;
+        let questions = [];
+        let currentQuestionIndex = 0;
+        let score = 0;
+        let userAnswers = [];
+
+        // Disney cartoon quiz questions pool
+        const questionPool = [
+            {
+                question: "What is the name of Simba's father in The Lion King?",
+                options: ["Scar", "Mufasa", "Rafiki"],
+                correct: 1
+            },
+            {
+                question: "Which Disney princess has a pet tiger named Rajah?",
+                options: ["Jasmine", "Belle", "Ariel"],
+                correct: 0
+            },
+            {
+                question: "What type of animal is Baloo from The Jungle Book?",
+                options: ["Panther", "Bear", "Elephant"],
+                correct: 1
+            },
+            {
+                question: "In Frozen, what is the name of Anna's sister?",
+                options: ["Elsa", "Rapunzel", "Moana"],
+                correct: 0
+            },
+            {
+                question: "What does Hakuna Matata mean?",
+                options: ["Good morning", "No worries", "Thank you"],
+                correct: 1
+            },
+            {
+                question: "Which Disney movie features the song 'A Whole New World'?",
+                options: ["Aladdin", "Beauty and the Beast", "Mulan"],
+                correct: 0
+            },
+            {
+                question: "What is the name of Ariel's fish friend in The Little Mermaid?",
+                options: ["Sebastian", "Flounder", "Scuttle"],
+                correct: 1
+            },
+            {
+                question: "In Toy Story, what is the name of Andy's neighbor?",
+                options: ["Sid", "Rex", "Woody"],
+                correct: 0
+            },
+            {
+                question: "What animal is Timon from The Lion King?",
+                options: ["Warthog", "Meerkat", "Hyena"],
+                correct: 1
+            },
+            {
+                question: "Which Disney character says 'Just keep swimming'?",
+                options: ["Nemo", "Dory", "Marlin"],
+                correct: 1
+            },
+            {
+                question: "What is the name of Mulan's dragon companion?",
+                options: ["Mushu", "Cri-Kee", "Khan"],
+                correct: 0
+            },
+            {
+                question: "In Beauty and the Beast, what is the name of Belle's father?",
+                options: ["Gaston", "Maurice", "Lumiere"],
+                correct: 1
+            },
+            {
+                question: "What does Cinderella's fairy godmother turn into a carriage?",
+                options: ["Apple", "Pumpkin", "Watermelon"],
+                correct: 1
+            },
+            {
+                question: "Which dwarf in Snow White wears glasses?",
+                options: ["Doc", "Grumpy", "Bashful"],
+                correct: 0
+            },
+            {
+                question: "What is the name of Rapunzel's chameleon in Tangled?",
+                options: ["Flynn", "Pascal", "Maximus"],
+                correct: 1
+            }
+        ];
+
+        // Initialize the game
+        window.onload = function() {
+            getUserLocation();
+        };
+
+        // Get user's current location
+        function getUserLocation() {
+            if (!navigator.geolocation) {
+                document.getElementById('locationStatus').innerHTML = '❌ Geolocation is not supported by your browser';
+                document.getElementById('startBtn').disabled = true;
+                return;
+            }
+
+            navigator.geolocation.getCurrentPosition(
+                position => {
+                    userLocation = {
+                        lat: position.coords.latitude,
+                        lng: position.coords.longitude
+                    };
+                    document.getElementById('locationStatus').innerHTML = 
+                        `✅ Location found: ${userLocation.lat.toFixed(6)}, ${userLocation.lng.toFixed(6)}`;
+                    document.getElementById('startBtn').disabled = false;
+                },
+                error => {
+                    document.getElementById('locationStatus').innerHTML = 
+                        `❌ Error: ${error.message}. Please enable location access.`;
+                    document.getElementById('startBtn').disabled = true;
+                }
+            );
+        }
+
+        // Start the game
+        function startGame() {
+            radius = parseInt(document.getElementById('radius').value);
+            
+            if (!userLocation) {
+                alert('Please allow location access to play!');
+                return;
+            }
+
+            if (radius < 10 || radius > 10000) {
+                alert('Please enter a radius between 10 and 10000 meters');
+                return;
+            }
+
+            // Select 5 random questions
+            questions = getRandomQuestions(5);
+            
+            // Assign random locations to questions
+            questions.forEach(q => {
+                q.location = getRandomLocationInRadius(userLocation, radius);
+                q.distance = calculateDistance(userLocation, q.location);
+            });
+
+            // Sort by distance (nearest first)
+            questions.sort((a, b) => a.distance - b.distance);
+
+            currentQuestionIndex = 0;
+            score = 0;
+            userAnswers = [];
+
+            showScreen('game-screen');
+            displayQuestion();
+        }
+
+        // Get random questions from pool
+        function getRandomQuestions(count) {
+            const shuffled = [...questionPool].sort(() => Math.random() - 0.5);
+            return shuffled.slice(0, count).map(q => ({...q}));
+        }
+
+        // Generate random location within radius
+        function getRandomLocationInRadius(center, radiusInMeters) {
+            const radiusInDegrees = radiusInMeters / 111320; // Approximate conversion
+            
+            const u = Math.random();
+            const v = Math.random();
+            const w = radiusInDegrees * Math.sqrt(u);
+            const t = 2 * Math.PI * v;
+            const x = w * Math.cos(t);
+            const y = w * Math.sin(t);
+            
+            return {
+                lat: center.lat + y,
+                lng: center.lng + x / Math.cos(center.lat * Math.PI / 180)
+            };
+        }
+
+        // Calculate distance between two points (Haversine formula)
+        function calculateDistance(point1, point2) {
+            const R = 6371e3; // Earth's radius in meters
+            const φ1 = point1.lat * Math.PI / 180;
+            const φ2 = point2.lat * Math.PI / 180;
+            const Δφ = (point2.lat - point1.lat) * Math.PI / 180;
+            const Δλ = (point2.lng - point1.lng) * Math.PI / 180;
+
+            const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
+                    Math.cos(φ1) * Math.cos(φ2) *
+                    Math.sin(Δλ/2) * Math.sin(Δλ/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+
+            return Math.round(R * c); // Distance in meters
+        }
+
+        // Display current question
+        function displayQuestion() {
+            const question = questions[currentQuestionIndex];
+            
+            document.getElementById('progress').textContent = 
+                `Question ${currentQuestionIndex + 1} of ${questions.length}`;
+            
+            document.getElementById('questionLocation').innerHTML = 
+                `📍 Question location: <span class="distance">${question.distance}m</span> away<br>` +
+                `Coordinates: ${question.location.lat.toFixed(6)}, ${question.location.lng.toFixed(6)}`;
+            
+            document.getElementById('questionText').textContent = question.question;
+            
+            const optionsContainer = document.getElementById('optionsContainer');
+            optionsContainer.innerHTML = '';
+            
+            question.options.forEach((option, index) => {
+                const optionDiv = document.createElement('div');
+                optionDiv.className = 'option';
+                optionDiv.textContent = option;
+                optionDiv.onclick = () => selectAnswer(index);
+                optionsContainer.appendChild(optionDiv);
+            });
+
+            document.getElementById('nextBtn').classList.remove('show');
+        }
+
+        // Handle answer selection
+        function selectAnswer(selectedIndex) {
+            const question = questions[currentQuestionIndex];
+            const options = document.querySelectorAll('.option');
+            
+            // Disable all options
+            options.forEach(opt => {
+                opt.classList.add('disabled');
+                opt.onclick = null;
+            });
+
+            // Mark correct and incorrect
+            options[question.correct].classList.add('correct');
+            if (selectedIndex !== question.correct) {
+                options[selectedIndex].classList.add('incorrect');
+            } else {
+                score++;
+            }
+
+            // Store user answer
+            userAnswers.push({
+                question: question.question,
+                userAnswer: question.options[selectedIndex],
+                correctAnswer: question.options[question.correct],
+                isCorrect: selectedIndex === question.correct
+            });
+
+            // Show next button
+            document.getElementById('nextBtn').classList.add('show');
+        }
+
+        // Move to next question or show results
+        function nextQuestion() {
+            currentQuestionIndex++;
+            
+            if (currentQuestionIndex < questions.length) {
+                displayQuestion();
+            } else {
+                showResults();
+            }
+        }
+
+        // Show results screen
+        function showResults() {
+            document.getElementById('finalScore').textContent = `${score}/${questions.length}`;
+            
+            let feedback = '';
+            const percentage = (score / questions.length) * 100;
+            
+            if (percentage === 100) {
+                feedback = "Perfect! You're a true Disney expert! 🌟";
+            } else if (percentage >= 80) {
+                feedback = "Excellent work! You know your Disney! 🎊";
+            } else if (percentage >= 60) {
+                feedback = "Good job! Keep watching those classics! 🎬";
+            } else {
+                feedback = "Nice try! Time for a Disney movie marathon! 🍿";
+            }
+            
+            document.getElementById('feedback').textContent = feedback;
+            
+            // Show detailed results
+            const resultsList = document.getElementById('resultsList');
+            resultsList.innerHTML = '<h3 style="margin-bottom: 15px;">Your Answers:</h3>';
+            
+            userAnswers.forEach((answer, index) => {
+                const resultItem = document.createElement('div');
+                resultItem.className = `result-item ${answer.isCorrect ? 'correct' : 'incorrect'}`;
+                resultItem.innerHTML = `
+                    <div class="result-question">${index + 1}. ${answer.question}</div>
+                    <div class="result-answer">
+                        Your answer: ${answer.userAnswer} ${answer.isCorrect ? '✓' : '✗'}<br>
+                        ${!answer.isCorrect ? `Correct answer: ${answer.correctAnswer}` : ''}
+                    </div>
+                `;
+                resultsList.appendChild(resultItem);
+            });
+
+            showScreen('results-screen');
+        }
+
+        // Reset game
+        function resetGame() {
+            currentQuestionIndex = 0;
+            score = 0;
+            userAnswers = [];
+            questions = [];
+            showScreen('setup-screen');
+            getUserLocation();
+        }
+
+        // Show specific screen
+        function showScreen(screenClass) {
+            document.querySelectorAll('.setup-screen, .game-screen, .results-screen').forEach(screen => {
+                screen.classList.remove('active');
+            });
+            document.querySelector(`.${screenClass}`).classList.add('active');
+        }
+    </script>
+</body>
+</html>
