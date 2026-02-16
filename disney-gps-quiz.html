@@ -331,6 +331,29 @@
             border-radius: 10px;
             margin-bottom: 15px;
         }
+
+        .timer-option-btn {
+            flex: 1;
+            padding: 12px;
+            background: white;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 15px;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        .timer-option-btn:hover {
+            border-color: #667eea;
+            background: #f0f4ff;
+        }
+
+        .timer-option-btn.active {
+            border-color: #667eea;
+            background: #667eea;
+            color: white;
+        }
     </style>
 </head>
 <body>
@@ -355,6 +378,28 @@
                     <option value="street">Обычная карта</option>
                     <option value="satellite">Спутник</option>
                 </select>
+            </div>
+
+            <div class="input-group">
+                <label>Ограничение по времени</label>
+                <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+                    <button type="button" onclick="selectTimerOption(false)" id="noTimerBtn" class="timer-option-btn active">
+                        Без таймера
+                    </button>
+                    <button type="button" onclick="selectTimerOption(true)" id="withTimerBtn" class="timer-option-btn">
+                        С таймером
+                    </button>
+                </div>
+                <div id="timerSettings" style="display: none;">
+                    <label for="timerMinutes">Время (минуты): <span id="timerValue">30</span></label>
+                    <input type="range" id="timerMinutes" min="1" max="60" value="30" 
+                        style="width: 100%; height: 8px; border-radius: 5px; background: #ddd; outline: none;"
+                        oninput="document.getElementById('timerValue').textContent = this.value">
+                    <div style="display: flex; justify-content: space-between; font-size: 12px; color: #666; margin-top: 5px;">
+                        <span>1 мин</span>
+                        <span>60 мин</span>
+                    </div>
+                </div>
             </div>
 
             <button class="btn" id="startBtn" onclick="showMapSelector()" disabled>Выбрать область на карте</button>
@@ -400,6 +445,9 @@
         <div class="map-screen">
             <div class="map-info">
                 <div style="font-weight: 600; margin-bottom: 10px;">🗺️ Карта вопросов</div>
+                <div id="timerDisplay" style="display: none; background: #fff3cd; padding: 10px; border-radius: 8px; margin-bottom: 10px; text-align: center; font-weight: 600; color: #856404;">
+                    ⏱️ Осталось времени: <span id="timeRemaining">30:00</span>
+                </div>
                 <div style="font-size: 14px; color: #666;">Подойдите к вопросу на расстояние 15м, чтобы разблокировать его</div>
                 <div class="map-legend">
                     <div class="legend-item">
@@ -471,7 +519,11 @@
         let drawnShape = null;
         let isDrawing = false;
         let drawingPoints = [];
-        const UNLOCK_DISTANCE = 50; // meters
+        let timerEnabled = false;
+        let timerMinutes = 30;
+        let timerInterval = null;
+        let timeLeft = 0;
+        const UNLOCK_DISTANCE = 15; // meters
 
         // Disney cartoon quiz questions pool in Russian
         const questionPool = [
@@ -564,6 +616,618 @@
                 options: ["Флинн", "Паскаль", "Максимус"],
                 correct: 1,
                 image: "https://images.unsplash.com/photo-1576859898415-f53858c0de0a?w=800&auto=format&fit=crop"
+            },
+            {
+                question: "Какого цвета платье Белль на балу?",
+                options: ["Розовое", "Синее", "Желтое"],
+                correct: 2,
+                image: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=800&auto=format&fit=crop"
+            },
+            {
+                question: "Как зовут снеговика в 'Холодном сердце'?",
+                options: ["Олаф", "Свен", "Кристоф"],
+                correct: 0,
+                image: "https://images.unsplash.com/photo-1483381719261-1d7f82f8c364?w=800&auto=format&fit=crop"
+            },
+            {
+                question: "Сколько сестёр у Ариэль?",
+                options: ["Пять", "Шесть", "Семь"],
+                correct: 1,
+                image: "https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=800&auto=format&fit=crop"
+            },
+            {
+                question: "Как зовут лучшего друга Винни-Пуха?",
+                options: ["Иа-Иа", "Пятачок", "Тигра"],
+                correct: 1,
+                image: "https://images.unsplash.com/photo-1587731556938-38755b4803a6?w=800&auto=format&fit=crop"
+            },
+            {
+                question: "Кто озвучивает Джинна в оригинальном 'Аладдине'?",
+                options: ["Робин Уильямс", "Том Хэнкс", "Эдди Мёрфи"],
+                correct: 0,
+                image: "https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=800&auto=format&fit=crop"
+            },
+            {
+                question: "Какой фрукт отравил Белоснежку?",
+                options: ["Груша", "Яблоко", "Апельсин"],
+                correct: 1,
+                image: "https://images.unsplash.com/photo-1509310982748-a9f5a0a00c7f?w=800&auto=format&fit=crop"
+            },
+            {
+                question: "Как зовут коня Рапунцель?",
+                options: ["Максимус", "Паскаль", "Флинн"],
+                correct: 0,
+                image: "https://images.unsplash.com/photo-1576859898415-f53858c0de0a?w=800&auto=format&fit=crop"
+            },
+            {
+                question: "Из какого материала сделан нос Пиноккио?",
+                options: ["Металл", "Дерево", "Пластик"],
+                correct: 1,
+                image: "https://images.unsplash.com/photo-1587731556938-38755b4803a6?w=800&auto=format&fit=crop"
+            },
+            {
+                question: "Как зовут злодейку в '101 далматинец'?",
+                options: ["Малефисента", "Урсула", "Круэлла"],
+                correct: 2,
+                image: "https://images.unsplash.com/photo-1535930891776-0c2dfb7fda1a?w=800&auto=format&fit=crop"
+            },
+            {
+                question: "Кто является лучшим другом Бэмби?",
+                options: ["Топотун", "Цветочек", "Фалин"],
+                correct: 0,
+                image: "https://images.unsplash.com/photo-1589656966895-2f33e7653819?w=800&auto=format&fit=crop"
+            },
+            {
+                question: "Какой подарок хотела Ариэль на свой день рождения?",
+                options: ["Жемчужину", "Статую", "Вилку"],
+                correct: 1,
+                image: "https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=800&auto=format&fit=crop"
+            },
+            {
+                question: "Как зовут крысу в 'Рататуе'?",
+                options: ["Реми", "Лингвини", "Эмиль"],
+                correct: 0,
+                image: "https://images.unsplash.com/photo-1535930891776-0c2dfb7fda1a?w=800&auto=format&fit=crop"
+            },
+            {
+                question: "Сколько гномов у Белоснежки?",
+                options: ["Пять", "Шесть", "Семь"],
+                correct: 2,
+                image: "https://images.unsplash.com/photo-1509310982748-a9f5a0a00c7f?w=800&auto=format&fit=crop"
+            },
+            {
+                question: "Как зовут фею в 'Питере Пэне'?",
+                options: ["Динь-Динь", "Флора", "Фауна"],
+                correct: 0,
+                image: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=800&auto=format&fit=crop"
+            },
+            {
+                question: "Где живёт Мулан?",
+                options: ["Япония", "Китай", "Корея"],
+                correct: 1,
+                image: "https://images.unsplash.com/photo-1451772741724-d20990422508?w=800&auto=format&fit=crop"
+            },
+            {
+                question: "Как зовут главную героиню в 'Храброй сердцем'?",
+                options: ["Мерида", "Моана", "Мулан"],
+                correct: 0,
+                image: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=800&auto=format&fit=crop"
+            },
+            {
+                question: "Какое животное Абу в 'Аладдине'?",
+                options: ["Обезьяна", "Попугай", "Хорёк"],
+                correct: 0,
+                image: "https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=800&auto=format&fit=crop"
+            },
+            {
+                question: "Как зовут злодея в 'Книге джунглей'?",
+                options: ["Шер-Хан", "Каа", "Король Луи"],
+                correct: 0,
+                image: "https://images.unsplash.com/photo-1589656966895-2f33e7653819?w=800&auto=format&fit=crop"
+            },
+            {
+                question: "Сколько желаний может исполнить Джинн?",
+                options: ["Два", "Три", "Неограниченно"],
+                correct: 1,
+                image: "https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=800&auto=format&fit=crop"
+            },
+            {
+                question: "Как зовут медведицу в 'Книге джунглей'?",
+                options: ["Багира", "Ракша", "Балу"],
+                correct: 1,
+                image: "https://images.unsplash.com/photo-1589656966895-2f33e7653819?w=800&auto=format&fit=crop"
+            },
+            {
+                question: "Что теряет Золушка на балу?",
+                options: ["Туфельку", "Корону", "Перчатку"],
+                correct: 0,
+                image: "https://images.unsplash.com/photo-1570043849279-7d0ca4675682?w=800&auto=format&fit=crop"
+            },
+            {
+                question: "Как зовут игрушечного ковбоя в 'Истории игрушек'?",
+                options: ["Вуди", "Базз", "Джесси"],
+                correct: 0,
+                image: "https://images.unsplash.com/photo-1587731556938-38755b4803a6?w=800&auto=format&fit=crop"
+            },
+            {
+                question: "Кто украл голос Ариэль?",
+                options: ["Малефисента", "Урсула", "Готель"],
+                correct: 1,
+                image: "https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=800&auto=format&fit=crop"
+            },
+            {
+                question: "Какого цвета волосы у Ариэль?",
+                options: ["Блондинка", "Рыжие", "Чёрные"],
+                correct: 1,
+                image: "https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=800&auto=format&fit=crop"
+            },
+            {
+                question: "Как зовут олененка, друга Бэмби?",
+                options: ["Фалин", "Топотун", "Цветочек"],
+                correct: 0,
+                image: "https://images.unsplash.com/photo-1589656966895-2f33e7653819?w=800&auto=format&fit=crop"
+            },
+            {
+                question: "Кто помогает Золушке попасть на бал?",
+                options: ["Фея-крёстная", "Мачеха", "Принц"],
+                correct: 0,
+                image: "https://images.unsplash.com/photo-1570043849279-7d0ca4675682?w=800&auto=format&fit=crop"
+            },
+            {
+                question: "Какое прозвище у Флинна Райдера?",
+                options: ["Всадник без головы", "Юджин Фицхерберт", "Прекрасный принц"],
+                correct: 1,
+                image: "https://images.unsplash.com/photo-1576859898415-f53858c0de0a?w=800&auto=format&fit=crop"
+            },
+            {
+                question: "Как зовут черепаху в 'В поисках Немо'?",
+                options: ["Дори", "Краш", "Брюс"],
+                correct: 1,
+                image: "https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=800&auto=format&fit=crop"
+            },
+            {
+                question: "Что любит есть Винни-Пух?",
+                options: ["Мёд", "Яблоки", "Пирог"],
+                correct: 0,
+                image: "https://images.unsplash.com/photo-1587731556938-38755b4803a6?w=800&auto=format&fit=crop"
+            },
+            {
+                question: "Как зовут злодейку в 'Рапунцель'?",
+                options: ["Малефисента", "Готель", "Урсула"],
+                correct: 1,
+                image: "https://images.unsplash.com/photo-1576859898415-f53858c0de0a?w=800&auto=format&fit=crop"
+            },
+            {
+                question: "Кто является королём животных в 'Короле Льве'?",
+                options: ["Симба", "Муфаса", "Шрам"],
+                correct: 1,
+                image: "https://images.unsplash.com/photo-1556103255-4443dbae8e5a?w=800&auto=format&fit=crop"
+            },
+            {
+                question: "Как зовут принца в 'Белоснежке'?",
+                options: ["Принц Филипп", "Принц Очарование", "Принц Флориан"],
+                correct: 2,
+                image: "https://images.unsplash.com/photo-1509310982748-a9f5a0a00c7f?w=800&auto=format&fit=crop"
+            },
+            {
+                question: "Какого цвета платье Золушки на балу?",
+                options: ["Розовое", "Голубое", "Белое"],
+                correct: 1,
+                image: "https://images.unsplash.com/photo-1570043849279-7d0ca4675682?w=800&auto=format&fit=crop"
+            },
+            {
+                question: "Как зовут принцессу-лягушку?",
+                options: ["Тиана", "Покахонтас", "Моана"],
+                correct: 0,
+                image: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=800&auto=format&fit=crop"
+            },
+            {
+                question: "Кто является врагом Капитана Крюка?",
+                options: ["Питер Пэн", "Аладдин", "Геркулес"],
+                correct: 0,
+                image: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=800&auto=format&fit=crop"
+            },
+            {
+                question: "Как зовут волшебницу в 'Спящей красавице'?",
+                options: ["Урсула", "Малефисента", "Мачеха"],
+                correct: 1,
+                image: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=800&auto=format&fit=crop"
+            },
+            {
+                question: "Сколько лет спала Аврора?",
+                options: ["Сто лет", "Двадцать лет", "Один год"],
+                correct: 0,
+                image: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=800&auto=format&fit=crop"
+            },
+            {
+                question: "Как зовут собаку Микки Мауса?",
+                options: ["Плуто", "Гуфи", "Дональд"],
+                correct: 0,
+                image: "https://images.unsplash.com/photo-1587731556938-38755b4803a6?w=800&auto=format&fit=crop"
+            },
+            {
+                question: "Где происходит действие фильма 'Моана'?",
+                options: ["Африка", "Полинезия", "Австралия"],
+                correct: 1,
+                image: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=800&auto=format&fit=crop"
+            },
+            {
+                question: "Как зовут вожака потерянных мальчишек в 'Питере Пэне'?",
+                options: ["Питер Пэн", "Майкл", "Джон"],
+                correct: 0,
+                image: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=800&auto=format&fit=crop"
+            },
+            {
+                question: "Какой инструмент играет Себастьян?",
+                options: ["Гитара", "Барабаны", "Труба"],
+                correct: 1,
+                image: "https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=800&auto=format&fit=crop"
+            },
+            {
+                question: "Как зовут бурундуков Чипа и Дейла?",
+                options: ["Чип и Дейл", "Тик и Так", "Том и Джерри"],
+                correct: 0,
+                image: "https://images.unsplash.com/photo-1535930891776-0c2dfb7fda1a?w=800&auto=format&fit=crop"
+            },
+            {
+                question: "Кто является лучшим другом Симбы?",
+                options: ["Тимон", "Пумба", "Нала"],
+                correct: 2,
+                image: "https://images.unsplash.com/photo-1556103255-4443dbae8e5a?w=800&auto=format&fit=crop"
+            },
+            {
+                question: "Как зовут курицу в 'Моане'?",
+                options: ["Хей-Хей", "Пуа", "Мауи"],
+                correct: 0,
+                image: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=800&auto=format&fit=crop"
+            },
+            {
+                question: "Какое животное Пумба?",
+                options: ["Сурикат", "Бородавочник", "Гиена"],
+                correct: 1,
+                image: "https://images.unsplash.com/photo-1556103255-4443dbae8e5a?w=800&auto=format&fit=crop"
+            },
+            {
+                question: "Как зовут мышонка, друга Золушки?",
+                options: ["Микки", "Гас", "Джерри"],
+                correct: 1,
+                image: "https://images.unsplash.com/photo-1570043849279-7d0ca4675682?w=800&auto=format&fit=crop"
+            },
+            {
+                question: "Кто такой Стич?",
+                options: ["Собака", "Инопланетянин", "Кот"],
+                correct: 1,
+                image: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=800&auto=format&fit=crop"
+            },
+            {
+                question: "Как зовут девочку в 'Лило и Стич'?",
+                options: ["Лило", "Моана", "Ванеллопа"],
+                correct: 0,
+                image: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=800&auto=format&fit=crop"
+            },
+            {
+                question: "Какое число написано на машине Молнии МакКуина?",
+                options: ["95", "86", "51"],
+                correct: 0,
+                image: "https://images.unsplash.com/photo-1587731556938-38755b4803a6?w=800&auto=format&fit=crop"
+            },
+            {
+                question: "Как зовут игрушечного космонавта в 'Истории игрушек'?",
+                options: ["Вуди", "Базз Лайтер", "Рекс"],
+                correct: 1,
+                image: "https://images.unsplash.com/photo-1587731556938-38755b4803a6?w=800&auto=format&fit=crop"
+            },
+            {
+                question: "Какую работу выполняет отец Мулан?",
+                options: ["Воин", "Фермер", "Торговец"],
+                correct: 0,
+                image: "https://images.unsplash.com/photo-1451772741724-d20990422508?w=800&auto=format&fit=crop"
+            },
+            {
+                question: "Как зовут крокодила в 'Питере Пэне'?",
+                options: ["Тик-Так", "Снэп", "Крок"],
+                correct: 0,
+                image: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=800&auto=format&fit=crop"
+            },
+            {
+                question: "Кто создал Пиноккио?",
+                options: ["Джузеппе", "Джепетто", "Джованни"],
+                correct: 1,
+                image: "https://images.unsplash.com/photo-1587731556938-38755b4803a6?w=800&auto=format&fit=crop"
+            },
+            {
+                question: "Как зовут слонёнка с большими ушами?",
+                options: ["Дамбо", "Симба", "Бэмби"],
+                correct: 0,
+                image: "https://images.unsplash.com/photo-1589656966895-2f33e7653819?w=800&auto=format&fit=crop"
+            },
+            {
+                question: "Сколько фей в 'Спящей красавице'?",
+                options: ["Две", "Три", "Четыре"],
+                correct: 1,
+                image: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=800&auto=format&fit=crop"
+            },
+            {
+                question: "Как зовут полубога в 'Моане'?",
+                options: ["Мауи", "Таматоа", "Туи"],
+                correct: 0,
+                image: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=800&auto=format&fit=crop"
+            },
+            {
+                question: "Какого цвета туфельки Дороти в 'Волшебнике страны Оз'?",
+                options: ["Серебряные", "Рубиновые", "Золотые"],
+                correct: 1,
+                image: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=800&auto=format&fit=crop"
+            },
+            {
+                question: "Как зовут няню детей в 'Питере Пэне'?",
+                options: ["Собака Нана", "Кошка Мари", "Птица Иаго"],
+                correct: 0,
+                image: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=800&auto=format&fit=crop"
+            },
+            {
+                question: "Какая планета родина Стича?",
+                options: ["Тура", "Квелта", "Юра"],
+                correct: 0,
+                image: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=800&auto=format&fit=crop"
+            },
+            {
+                question: "Как зовут мальчика в 'Книге джунглей'?",
+                options: ["Маугли", "Акела", "Багира"],
+                correct: 0,
+                image: "https://images.unsplash.com/photo-1589656966895-2f33e7653819?w=800&auto=format&fit=crop"
+            },
+            {
+                question: "Какой цвет любит Рапунцель?",
+                options: ["Розовый", "Фиолетовый", "Зелёный"],
+                correct: 1,
+                image: "https://images.unsplash.com/photo-1576859898415-f53858c0de0a?w=800&auto=format&fit=crop"
+            },
+            {
+                question: "Как зовут канделябр в 'Красавице и Чудовище'?",
+                options: ["Люмьер", "Когсворт", "Чип"],
+                correct: 0,
+                image: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=800&auto=format&fit=crop"
+            },
+            {
+                question: "Кто помог Мулан стать воином?",
+                options: ["Мушу", "Отец", "Шан"],
+                correct: 0,
+                image: "https://images.unsplash.com/photo-1451772741724-d20990422508?w=800&auto=format&fit=crop"
+            },
+            {
+                question: "Как зовут часы в 'Красавице и Чудовище'?",
+                options: ["Люмьер", "Когсворт", "Плюметт"],
+                correct: 1,
+                image: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=800&auto=format&fit=crop"
+            },
+            {
+                question: "Сколько братьев у принца Ганса в 'Холодном сердце'?",
+                options: ["10", "12", "15"],
+                correct: 1,
+                image: "https://images.unsplash.com/photo-1483381719261-1d7f82f8c364?w=800&auto=format&fit=crop"
+            },
+            {
+                question: "Как зовут оленя Кристофа?",
+                options: ["Олаф", "Свен", "Ганс"],
+                correct: 1,
+                image: "https://images.unsplash.com/photo-1483381719261-1d7f82f8c364?w=800&auto=format&fit=crop"
+            },
+            {
+                question: "Какой породы собака Леди?",
+                options: ["Кокер-спаниель", "Такса", "Пудель"],
+                correct: 0,
+                image: "https://images.unsplash.com/photo-1535930891776-0c2dfb7fda1a?w=800&auto=format&fit=crop"
+            },
+            {
+                question: "Как зовут владельца игрушек в 'Истории игрушек'?",
+                options: ["Энди", "Сид", "Базз"],
+                correct: 0,
+                image: "https://images.unsplash.com/photo-1587731556938-38755b4803a6?w=800&auto=format&fit=crop"
+            },
+            {
+                question: "Кто является наставником Геркулеса?",
+                options: ["Зевс", "Филоктет", "Аид"],
+                correct: 1,
+                image: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=800&auto=format&fit=crop"
+            },
+            {
+                question: "Как зовут кота в 'Золушке'?",
+                options: ["Люцифер", "Гас", "Жак"],
+                correct: 0,
+                image: "https://images.unsplash.com/photo-1570043849279-7d0ca4675682?w=800&auto=format&fit=crop"
+            },
+            {
+                question: "Сколько лет Эльзе когда она становится королевой?",
+                options: ["18", "21", "25"],
+                correct: 1,
+                image: "https://images.unsplash.com/photo-1483381719261-1d7f82f8c364?w=800&auto=format&fit=crop"
+            },
+            {
+                question: "Как зовут рыбку отца Немо?",
+                options: ["Марлин", "Брюс", "Краш"],
+                correct: 0,
+                image: "https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=800&auto=format&fit=crop"
+            },
+            {
+                question: "Какого цвета шляпа у Белоснежки?",
+                options: ["Красная", "Синяя", "Жёлтая"],
+                correct: 0,
+                image: "https://images.unsplash.com/photo-1509310982748-a9f5a0a00c7f?w=800&auto=format&fit=crop"
+            },
+            {
+                question: "Как зовут мышонка Микки?",
+                options: ["Микки Маус", "Дональд Дак", "Гуфи"],
+                correct: 0,
+                image: "https://images.unsplash.com/photo-1587731556938-38755b4803a6?w=800&auto=format&fit=crop"
+            },
+            {
+                question: "Кто поёт песню 'Отпусти и забудь'?",
+                options: ["Анна", "Эльза", "Олаф"],
+                correct: 1,
+                image: "https://images.unsplash.com/photo-1483381719261-1d7f82f8c364?w=800&auto=format&fit=crop"
+            },
+            {
+                question: "Как зовут робота в 'ВАЛЛ-И'?",
+                options: ["ВАЛЛ-И", "ЕВА", "М-О"],
+                correct: 0,
+                image: "https://images.unsplash.com/photo-1587731556938-38755b4803a6?w=800&auto=format&fit=crop"
+            },
+            {
+                question: "Сколько лет спит Спящая красавица?",
+                options: ["50", "100", "150"],
+                correct: 1,
+                image: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=800&auto=format&fit=crop"
+            },
+            {
+                question: "Как зовут принца в 'Русалочке'?",
+                options: ["Эрик", "Адам", "Филипп"],
+                correct: 0,
+                image: "https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=800&auto=format&fit=crop"
+            },
+            {
+                question: "Что Ариэль коллекционирует?",
+                options: ["Жемчуг", "Человеческие предметы", "Ракушки"],
+                correct: 1,
+                image: "https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=800&auto=format&fit=crop"
+            },
+            {
+                question: "Как зовут короля тритонов?",
+                options: ["Тритон", "Себастьян", "Эрик"],
+                correct: 0,
+                image: "https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=800&auto=format&fit=crop"
+            },
+            {
+                question: "Какой музыкальный инструмент играет Король Тритон?",
+                options: ["Трезубец", "Арфа", "Труба"],
+                correct: 0,
+                image: "https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=800&auto=format&fit=crop"
+            },
+            {
+                question: "Как зовут лучшую подругу Рапунцель (хамелеон)?",
+                options: ["Максимус", "Паскаль", "Флинн"],
+                correct: 1,
+                image: "https://images.unsplash.com/photo-1576859898415-f53858c0de0a?w=800&auto=format&fit=crop"
+            },
+            {
+                question: "Какой магический предмет есть у Эльзы?",
+                options: ["Волшебная палочка", "Ледяные силы", "Корона"],
+                correct: 1,
+                image: "https://images.unsplash.com/photo-1483381719261-1d7f82f8c364?w=800&auto=format&fit=crop"
+            },
+            {
+                question: "Кто озвучивает Базза Лайтера в русском дубляже?",
+                options: ["Дмитрий Назаров", "Константин Хабенский", "Владимир Машков"],
+                correct: 0,
+                image: "https://images.unsplash.com/photo-1587731556938-38755b4803a6?w=800&auto=format&fit=crop"
+            },
+            {
+                question: "Как зовут мать Бэмби?",
+                options: ["Фалин", "Мама Бэмби", "Топотун"],
+                correct: 1,
+                image: "https://images.unsplash.com/photo-1589656966895-2f33e7653819?w=800&auto=format&fit=crop"
+            },
+            {
+                question: "Кто является злодеем в 'Аладдине'?",
+                options: ["Джафар", "Джинн", "Абу"],
+                correct: 0,
+                image: "https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=800&auto=format&fit=crop"
+            },
+            {
+                question: "Как зовут попугая Джафара?",
+                options: ["Яго", "Абу", "Раджа"],
+                correct: 0,
+                image: "https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=800&auto=format&fit=crop"
+            },
+            {
+                question: "Сколько далматинцев в фильме '101 далматинец'?",
+                options: ["99", "101", "100"],
+                correct: 1,
+                image: "https://images.unsplash.com/photo-1535930891776-0c2dfb7fda1a?w=800&auto=format&fit=crop"
+            },
+            {
+                question: "Как зовут медведя в 'Маугли'?",
+                options: ["Балу", "Багира", "Шер-Хан"],
+                correct: 0,
+                image: "https://images.unsplash.com/photo-1589656966895-2f33e7653819?w=800&auto=format&fit=crop"
+            },
+            {
+                question: "Какое животное Багира?",
+                options: ["Тигр", "Пантера", "Леопард"],
+                correct: 1,
+                image: "https://images.unsplash.com/photo-1589656966895-2f33e7653819?w=800&auto=format&fit=crop"
+            },
+            {
+                question: "Как зовут принца в 'Красавице и Чудовище'?",
+                options: ["Адам", "Эрик", "Филипп"],
+                correct: 0,
+                image: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=800&auto=format&fit=crop"
+            },
+            {
+                question: "Сколько лет было Ариэль?",
+                options: ["15", "16", "17"],
+                correct: 1,
+                image: "https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=800&auto=format&fit=crop"
+            },
+            {
+                question: "Как зовут злодея в 'Геркулесе'?",
+                options: ["Аид", "Зевс", "Посейдон"],
+                correct: 0,
+                image: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=800&auto=format&fit=crop"
+            },
+            {
+                question: "Какого цвета платье Мериды?",
+                options: ["Синее", "Зелёное", "Красное"],
+                correct: 1,
+                image: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=800&auto=format&fit=crop"
+            },
+            {
+                question: "Как зовут первого ребёнка Хелен Парр (Миссис Исключительная)?",
+                options: ["Вайолет", "Дэш", "Джек-Джек"],
+                correct: 0,
+                image: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=800&auto=format&fit=crop"
+            },
+            {
+                question: "Кто является отцом Симбы?",
+                options: ["Шрам", "Муфаса", "Рафики"],
+                correct: 1,
+                image: "https://images.unsplash.com/photo-1556103255-4443dbae8e5a?w=800&auto=format&fit=crop"
+            },
+            {
+                question: "Как зовут мудрую обезьяну в 'Короле Льве'?",
+                options: ["Рафики", "Зазу", "Эд"],
+                correct: 0,
+                image: "https://images.unsplash.com/photo-1556103255-4443dbae8e5a?w=800&auto=format&fit=crop"
+            },
+            {
+                question: "Какое оружие использует Мерида?",
+                options: ["Меч", "Лук и стрелы", "Копьё"],
+                correct: 1,
+                image: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=800&auto=format&fit=crop"
+            },
+            {
+                question: "Как зовут ленивца в 'Зверополисе'?",
+                options: ["Флэш", "Ник", "Джуди"],
+                correct: 0,
+                image: "https://images.unsplash.com/photo-1535930891776-0c2dfb7fda1a?w=800&auto=format&fit=crop"
+            },
+            {
+                question: "Кто главная героиня 'Зверополиса'?",
+                options: ["Джуди Хопс", "Газелла", "Беллуэзер"],
+                correct: 0,
+                image: "https://images.unsplash.com/photo-1535930891776-0c2dfb7fda1a?w=800&auto=format&fit=crop"
+            },
+            {
+                question: "Как зовут лису в 'Зверополисе'?",
+                options: ["Ник Уайлд", "Флэш", "Клоухаузер"],
+                correct: 0,
+                image: "https://images.unsplash.com/photo-1535930891776-0c2dfb7fda1a?w=800&auto=format&fit=crop"
+            },
+            {
+                question: "Какая профессия у Джуди в 'Зверополисе'?",
+                options: ["Полицейский", "Врач", "Учитель"],
+                correct: 0,
+                image: "https://images.unsplash.com/photo-1535930891776-0c2dfb7fda1a?w=800&auto=format&fit=crop"
             }
         ];
 
@@ -596,10 +1260,26 @@
             );
         }
 
+        // Select timer option
+        function selectTimerOption(enabled) {
+            timerEnabled = enabled;
+            
+            // Update button states
+            document.getElementById('noTimerBtn').classList.toggle('active', !enabled);
+            document.getElementById('withTimerBtn').classList.toggle('active', enabled);
+            
+            // Show/hide timer settings
+            document.getElementById('timerSettings').style.display = enabled ? 'block' : 'none';
+        }
+
         // Show map selector screen
         function showMapSelector() {
             questionCount = parseInt(document.getElementById('questionCount').value);
             mapStyle = document.getElementById('mapStyle').value;
+            
+            if (timerEnabled) {
+                timerMinutes = parseInt(document.getElementById('timerMinutes').value);
+            }
             
             if (!userLocation) {
                 alert('Пожалуйста, разрешите доступ к местоположению!');
@@ -692,55 +1372,176 @@
             let tempShape = null;
             let isMouseDown = false;
 
-            selectorMap.on('mousedown', function(e) {
+            // Handle both mouse and touch events
+            function handleStart(e) {
+                const latlng = e.latlng;
+                
                 if (currentDrawingTool === 'polygon') {
                     return; // Polygon uses click events
                 }
                 
                 isMouseDown = true;
-                startPoint = e.latlng;
+                startPoint = latlng;
                 isDrawing = true;
                 
                 if (drawnShape) {
                     selectorMap.removeLayer(drawnShape);
                     drawnShape = null;
                 }
-            });
+                
+                if (tempShape) {
+                    selectorMap.removeLayer(tempShape);
+                    tempShape = null;
+                }
+            }
 
-            selectorMap.on('click', function(e) {
-                if (currentDrawingTool === 'polygon') {
-                    // Add point to polygon
-                    drawingPoints.push(e.latlng);
+            function handleMove(e) {
+                if (!isMouseDown || !startPoint) return;
+                
+                const latlng = e.latlng;
+
+                if (currentDrawingTool === 'circle') {
+                    const radius = startPoint.distanceTo(latlng);
                     
-                    if (drawingPoints.length === 1) {
-                        isDrawing = true;
-                        if (drawnShape) {
-                            selectorMap.removeLayer(drawnShape);
-                            drawnShape = null;
-                        }
-                    }
-                    
-                    // Draw temporary polygon
                     if (tempShape) {
                         selectorMap.removeLayer(tempShape);
                     }
                     
-                    if (drawingPoints.length >= 2) {
-                        tempShape = L.polygon(drawingPoints, {
-                            color: '#667eea',
-                            fillColor: '#667eea',
-                            fillOpacity: 0.2,
-                            weight: 3
-                        }).addTo(selectorMap);
-                    } else if (drawingPoints.length === 1) {
-                        // Show a marker for the first point
-                        tempShape = L.circleMarker(drawingPoints[0], {
-                            radius: 5,
-                            color: '#667eea',
-                            fillColor: '#667eea',
-                            fillOpacity: 0.5
-                        }).addTo(selectorMap);
+                    tempShape = L.circle(startPoint, {
+                        radius: radius,
+                        color: '#667eea',
+                        fillColor: '#667eea',
+                        fillOpacity: 0.2,
+                        weight: 3
+                    }).addTo(selectorMap);
+                    
+                } else if (currentDrawingTool === 'rectangle') {
+                    if (tempShape) {
+                        selectorMap.removeLayer(tempShape);
                     }
+                    
+                    const bounds = L.latLngBounds(startPoint, latlng);
+                    tempShape = L.rectangle(bounds, {
+                        color: '#667eea',
+                        fillColor: '#667eea',
+                        fillOpacity: 0.2,
+                        weight: 3
+                    }).addTo(selectorMap);
+                }
+            }
+
+            function handleEnd(e) {
+                if (!isMouseDown || !startPoint) return;
+                
+                const latlng = e.latlng;
+                isMouseDown = false;
+
+                if (currentDrawingTool === 'circle') {
+                    const radius = startPoint.distanceTo(latlng);
+                    
+                    if (radius < 10) {
+                        // Too small, ignore
+                        if (tempShape) {
+                            selectorMap.removeLayer(tempShape);
+                            tempShape = null;
+                        }
+                        isDrawing = false;
+                        startPoint = null;
+                        return;
+                    }
+                    
+                    if (tempShape) {
+                        selectorMap.removeLayer(tempShape);
+                    }
+                    
+                    drawnShape = L.circle(startPoint, {
+                        radius: radius,
+                        color: '#667eea',
+                        fillColor: '#667eea',
+                        fillOpacity: 0.2,
+                        weight: 3
+                    }).addTo(selectorMap);
+                    
+                    selectedCenter = startPoint;
+                    isDrawing = false;
+                    startPoint = null;
+                    
+                    document.getElementById('drawingHint').textContent = '✓ Круг создан! Можете подтвердить или нарисовать заново';
+                    
+                } else if (currentDrawingTool === 'rectangle') {
+                    const bounds = L.latLngBounds(startPoint, latlng);
+                    
+                    // Check if rectangle is too small
+                    const size = startPoint.distanceTo(latlng);
+                    if (size < 10) {
+                        if (tempShape) {
+                            selectorMap.removeLayer(tempShape);
+                            tempShape = null;
+                        }
+                        isDrawing = false;
+                        startPoint = null;
+                        return;
+                    }
+                    
+                    if (tempShape) {
+                        selectorMap.removeLayer(tempShape);
+                    }
+                    
+                    drawnShape = L.rectangle(bounds, {
+                        color: '#667eea',
+                        fillColor: '#667eea',
+                        fillOpacity: 0.2,
+                        weight: 3
+                    }).addTo(selectorMap);
+                    
+                    selectedCenter = bounds.getCenter();
+                    isDrawing = false;
+                    startPoint = null;
+                    
+                    document.getElementById('drawingHint').textContent = '✓ Прямоугольник создан! Можете подтвердить или нарисовать заново';
+                }
+            }
+
+            // Mouse events
+            selectorMap.on('mousedown', handleStart);
+            selectorMap.on('mousemove', handleMove);
+            selectorMap.on('mouseup', handleEnd);
+
+            // Polygon uses click events
+            selectorMap.on('click', function(e) {
+                if (currentDrawingTool !== 'polygon') return;
+                
+                // Add point to polygon
+                drawingPoints.push(e.latlng);
+                
+                if (drawingPoints.length === 1) {
+                    isDrawing = true;
+                    if (drawnShape) {
+                        selectorMap.removeLayer(drawnShape);
+                        drawnShape = null;
+                    }
+                }
+                
+                // Draw temporary polygon
+                if (tempShape) {
+                    selectorMap.removeLayer(tempShape);
+                }
+                
+                if (drawingPoints.length >= 2) {
+                    tempShape = L.polygon(drawingPoints, {
+                        color: '#667eea',
+                        fillColor: '#667eea',
+                        fillOpacity: 0.2,
+                        weight: 3
+                    }).addTo(selectorMap);
+                } else if (drawingPoints.length === 1) {
+                    // Show a marker for the first point
+                    tempShape = L.circleMarker(drawingPoints[0], {
+                        radius: 5,
+                        color: '#667eea',
+                        fillColor: '#667eea',
+                        fillOpacity: 0.5
+                    }).addTo(selectorMap);
                 }
             });
 
@@ -768,103 +1569,6 @@
                     drawingPoints = [];
                     
                     document.getElementById('drawingHint').textContent = '✓ Форма создана! Можете подтвердить или нарисовать заново';
-                }
-            });
-
-            selectorMap.on('mousemove', function(e) {
-                if (!isMouseDown || !startPoint) return;
-
-                if (currentDrawingTool === 'circle') {
-                    const radius = startPoint.distanceTo(e.latlng);
-                    
-                    if (tempShape) {
-                        selectorMap.removeLayer(tempShape);
-                    }
-                    
-                    tempShape = L.circle(startPoint, {
-                        radius: radius,
-                        color: '#667eea',
-                        fillColor: '#667eea',
-                        fillOpacity: 0.2,
-                        weight: 3
-                    }).addTo(selectorMap);
-                    
-                } else if (currentDrawingTool === 'rectangle') {
-                    if (tempShape) {
-                        selectorMap.removeLayer(tempShape);
-                    }
-                    
-                    const bounds = L.latLngBounds(startPoint, e.latlng);
-                    tempShape = L.rectangle(bounds, {
-                        color: '#667eea',
-                        fillColor: '#667eea',
-                        fillOpacity: 0.2,
-                        weight: 3
-                    }).addTo(selectorMap);
-                }
-            });
-
-            selectorMap.on('mouseup', function(e) {
-                if (!isMouseDown || !startPoint) return;
-                isMouseDown = false;
-
-                if (currentDrawingTool === 'circle') {
-                    const radius = startPoint.distanceTo(e.latlng);
-                    
-                    if (radius < 10) {
-                        // Too small, ignore
-                        if (tempShape) {
-                            selectorMap.removeLayer(tempShape);
-                            tempShape = null;
-                        }
-                        isDrawing = false;
-                        return;
-                    }
-                    
-                    if (tempShape) {
-                        selectorMap.removeLayer(tempShape);
-                    }
-                    
-                    drawnShape = L.circle(startPoint, {
-                        radius: radius,
-                        color: '#667eea',
-                        fillColor: '#667eea',
-                        fillOpacity: 0.2,
-                        weight: 3
-                    }).addTo(selectorMap);
-                    
-                    selectedCenter = startPoint;
-                    isDrawing = false;
-                    startPoint = null;
-                    
-                    document.getElementById('drawingHint').textContent = '✓ Круг создан! Можете подтвердить или нарисовать заново';
-                    
-                } else if (currentDrawingTool === 'rectangle') {
-                    if (tempShape) {
-                        selectorMap.removeLayer(tempShape);
-                    }
-                    
-                    const bounds = L.latLngBounds(startPoint, e.latlng);
-                    
-                    // Check if rectangle is too small
-                    const size = startPoint.distanceTo(e.latlng);
-                    if (size < 10) {
-                        isDrawing = false;
-                        return;
-                    }
-                    
-                    drawnShape = L.rectangle(bounds, {
-                        color: '#667eea',
-                        fillColor: '#667eea',
-                        fillOpacity: 0.2,
-                        weight: 3
-                    }).addTo(selectorMap);
-                    
-                    selectedCenter = bounds.getCenter();
-                    isDrawing = false;
-                    startPoint = null;
-                    
-                    document.getElementById('drawingHint').textContent = '✓ Прямоугольник создан! Можете подтвердить или нарисовать заново';
                 }
             });
         }
@@ -960,6 +1664,11 @@
             initMap();
             startLocationTracking();
             startCompassTracking();
+            
+            // Start timer if enabled
+            if (timerEnabled) {
+                startTimer();
+            }
         }
 
         // Initialize map
@@ -1288,10 +1997,55 @@
             return R * c;
         }
 
+        // Start timer
+        function startTimer() {
+            timeLeft = timerMinutes * 60; // Convert to seconds
+            document.getElementById('timerDisplay').style.display = 'block';
+            updateTimerDisplay();
+            
+            timerInterval = setInterval(() => {
+                timeLeft--;
+                updateTimerDisplay();
+                
+                if (timeLeft <= 0) {
+                    stopTimer();
+                    alert('⏰ Время вышло! Викторина завершена.');
+                    showResults();
+                }
+            }, 1000);
+        }
+
+        // Stop timer
+        function stopTimer() {
+            if (timerInterval) {
+                clearInterval(timerInterval);
+                timerInterval = null;
+            }
+        }
+
+        // Update timer display
+        function updateTimerDisplay() {
+            const minutes = Math.floor(timeLeft / 60);
+            const seconds = timeLeft % 60;
+            const display = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+            document.getElementById('timeRemaining').textContent = display;
+            
+            // Change color when time is running out
+            const timerDisplay = document.getElementById('timerDisplay');
+            if (timeLeft <= 60) {
+                timerDisplay.style.background = '#f8d7da';
+                timerDisplay.style.color = '#721c24';
+            } else if (timeLeft <= 300) {
+                timerDisplay.style.background = '#fff3cd';
+                timerDisplay.style.color = '#856404';
+            }
+        }
+
         // Show results screen
         function showResults() {
             stopLocationTracking();
             stopCompassTracking();
+            stopTimer();
             
             const answeredCount = questions.filter(q => q.answered).length;
             document.getElementById('finalScore').textContent = `${score}/${answeredCount}`;
@@ -1342,11 +2096,15 @@
         function resetGame() {
             stopLocationTracking();
             stopCompassTracking();
+            stopTimer();
             questions = [];
             questionMarkers = [];
             score = 0;
             currentHeading = 0;
             selectedCenter = null;
+            timerEnabled = false;
+            timerMinutes = 30;
+            timeLeft = 0;
             if (map) {
                 map.remove();
                 map = null;
@@ -1355,6 +2113,7 @@
                 selectorMap.remove();
                 selectorMap = null;
             }
+            document.getElementById('timerDisplay').style.display = 'none';
             showScreen('setup-screen');
             getUserLocation();
         }
