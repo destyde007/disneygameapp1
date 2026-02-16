@@ -43,11 +43,11 @@
             font-size: 14px;
         }
 
-        .setup-screen, .map-screen, .question-screen, .results-screen {
+        .setup-screen, .map-selector-screen, .map-screen, .question-screen, .results-screen {
             display: none;
         }
 
-        .setup-screen.active, .map-screen.active, .question-screen.active, .results-screen.active {
+        .setup-screen.active, .map-selector-screen.active, .map-screen.active, .question-screen.active, .results-screen.active {
             display: block;
         }
 
@@ -328,13 +328,35 @@
                 </select>
             </div>
 
-            <div class="input-group">
-                <label for="radius">Радиус поиска (метры)</label>
-                <input type="number" id="radius" min="10" max="10000" value="500" placeholder="Введите радиус в метрах">
-                <small>Вопросы будут случайно размещены в этом радиусе от вашего текущего местоположения</small>
+            <button class="btn" id="startBtn" onclick="showMapSelector()" disabled>Выбрать область на карте</button>
+        </div>
+
+        <!-- Map Selector Screen -->
+        <div class="map-selector-screen">
+            <div class="map-info">
+                <div style="font-weight: 600; margin-bottom: 10px;">🎯 Выберите область для вопросов</div>
+                <div style="font-size: 14px; color: #666; margin-bottom: 10px;">
+                    Нажмите на карту, чтобы установить центр, затем перетащите ползунок для изменения радиуса
+                </div>
             </div>
 
-            <button class="btn" id="startBtn" onclick="startGame()" disabled>Начать викторину!</button>
+            <div class="radius-control" style="background: #f0f4ff; padding: 15px; border-radius: 10px; margin-bottom: 15px;">
+                <label for="radiusSlider" style="display: block; margin-bottom: 10px; font-weight: 600;">
+                    Радиус: <span id="radiusValue">500</span> метров
+                </label>
+                <input type="range" id="radiusSlider" min="50" max="2000" value="500" 
+                    style="width: 100%; height: 8px; border-radius: 5px; background: #ddd; outline: none;"
+                    oninput="updateCircleRadius(this.value)">
+                <div style="display: flex; justify-content: space-between; font-size: 12px; color: #666; margin-top: 5px;">
+                    <span>50м</span>
+                    <span>2000м</span>
+                </div>
+            </div>
+            
+            <div id="selectorMap" style="height: 400px; border-radius: 15px; margin-bottom: 20px;"></div>
+            
+            <button class="btn" onclick="confirmAreaSelection()">Подтвердить область</button>
+            <button class="btn" onclick="backToSetup()" style="background: #6c757d; margin-top: 10px;">Назад</button>
         </div>
 
         <!-- Map Screen -->
@@ -394,6 +416,10 @@
         // Game state
         let userLocation = null;
         let map = null;
+        let selectorMap = null;
+        let selectionCircle = null;
+        let centerMarker = null;
+        let selectedCenter = null;
         let userMarker = null;
         let questionMarkers = [];
         let radius = 500;
@@ -514,6 +540,124 @@
             );
         }
 
+        // Show map selector screen
+        function showMapSelector() {
+            questionCount = parseInt(document.getElementById('questionCount').value);
+            mapStyle = document.getElementById('mapStyle').value;
+            
+            if (!userLocation) {
+                alert('Пожалуйста, разрешите доступ к местоположению!');
+                return;
+            }
+
+            if (questionCount < 1 || questionCount > 15) {
+                alert('Пожалуйста, введите количество вопросов от 1 до 15');
+                return;
+            }
+
+            showScreen('map-selector-screen');
+            initSelectorMap();
+        }
+
+        // Initialize the selector map
+        function initSelectorMap() {
+            if (selectorMap) {
+                selectorMap.remove();
+            }
+
+            selectorMap = L.map('selectorMap').setView([userLocation.lat, userLocation.lng], 15);
+            
+            // Add tile layer based on selected style
+            const tileUrls = {
+                street: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+                satellite: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
+            };
+            
+            const attributions = {
+                street: '© OpenStreetMap contributors',
+                satellite: '© Esri, Maxar, Earthstar Geographics'
+            };
+            
+            L.tileLayer(tileUrls[mapStyle], {
+                attribution: attributions[mapStyle]
+            }).addTo(selectorMap);
+
+            // Add user location marker
+            L.marker([userLocation.lat, userLocation.lng], {
+                icon: L.divIcon({
+                    className: 'user-marker',
+                    html: '<div style="background: #2196f3; width: 16px; height: 16px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.3);"></div>',
+                    iconSize: [16, 16],
+                    iconAnchor: [8, 8]
+                })
+            }).addTo(selectorMap);
+
+            // Set default selected center to user location
+            selectedCenter = {lat: userLocation.lat, lng: userLocation.lng};
+            radius = 500;
+
+            // Add initial circle
+            selectionCircle = L.circle([selectedCenter.lat, selectedCenter.lng], {
+                radius: radius,
+                color: '#667eea',
+                fillColor: '#667eea',
+                fillOpacity: 0.2,
+                weight: 3
+            }).addTo(selectorMap);
+
+            // Add center marker
+            centerMarker = L.marker([selectedCenter.lat, selectedCenter.lng], {
+                icon: L.divIcon({
+                    className: 'center-marker',
+                    html: '<div style="background: #ff5722; width: 20px; height: 20px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.3);"></div>',
+                    iconSize: [20, 20],
+                    iconAnchor: [10, 10]
+                }),
+                draggable: true
+            }).addTo(selectorMap);
+
+            // Update circle when marker is dragged
+            centerMarker.on('drag', function(e) {
+                selectedCenter = e.target.getLatLng();
+                selectionCircle.setLatLng(selectedCenter);
+            });
+
+            // Allow clicking on map to move center
+            selectorMap.on('click', function(e) {
+                selectedCenter = e.latlng;
+                centerMarker.setLatLng(selectedCenter);
+                selectionCircle.setLatLng(selectedCenter);
+            });
+        }
+
+        // Update circle radius from slider
+        function updateCircleRadius(value) {
+            radius = parseInt(value);
+            document.getElementById('radiusValue').textContent = radius;
+            if (selectionCircle) {
+                selectionCircle.setRadius(radius);
+            }
+        }
+
+        // Confirm area selection and start game
+        function confirmAreaSelection() {
+            if (!selectedCenter) {
+                alert('Пожалуйста, выберите центр области на карте');
+                return;
+            }
+
+            startGame();
+        }
+
+        // Back to setup screen
+        function backToSetup() {
+            if (selectorMap) {
+                selectorMap.remove();
+                selectorMap = null;
+            }
+            showScreen('setup-screen');
+        }
+
         // Start tracking user location
         function startLocationTracking() {
             if (navigator.geolocation) {
@@ -542,32 +686,22 @@
 
         // Start the game
         function startGame() {
-            questionCount = parseInt(document.getElementById('questionCount').value);
-            radius = parseInt(document.getElementById('radius').value);
-            mapStyle = document.getElementById('mapStyle').value;
-            
             if (!userLocation) {
                 alert('Пожалуйста, разрешите доступ к местоположению!');
                 return;
             }
 
-            if (questionCount < 1 || questionCount > 15) {
-                alert('Пожалуйста, введите количество вопросов от 1 до 15');
-                return;
-            }
-
-            if (radius < 10 || radius > 10000) {
-                alert('Пожалуйста, введите радиус от 10 до 10000 метров');
-                return;
+            if (!selectedCenter) {
+                selectedCenter = {lat: userLocation.lat, lng: userLocation.lng};
             }
 
             // Select random questions
             questions = getRandomQuestions(questionCount);
             
-            // Assign random locations to questions
+            // Assign random locations to questions within the selected area
             questions.forEach((q, index) => {
                 q.id = index;
-                q.location = getRandomLocationInRadius(userLocation, radius);
+                q.location = getRandomLocationInRadius(selectedCenter, radius);
                 q.distance = calculateDistance(userLocation, q.location);
                 q.unlocked = false;
                 q.answered = false;
@@ -575,6 +709,12 @@
             });
 
             score = 0;
+
+            // Clean up selector map
+            if (selectorMap) {
+                selectorMap.remove();
+                selectorMap = null;
+            }
 
             showScreen('map-screen');
             initMap();
@@ -634,12 +774,23 @@
                 questionMarkers.push(marker);
             });
 
-            // Draw radius circle
-            L.circle([userLocation.lat, userLocation.lng], {
+            // Draw selection area circle
+            L.circle([selectedCenter.lat, selectedCenter.lng], {
                 radius: radius,
                 color: '#667eea',
                 fillColor: '#667eea',
-                fillOpacity: 0.1
+                fillOpacity: 0.1,
+                weight: 2
+            }).addTo(map);
+
+            // Mark the center of selection area
+            L.marker([selectedCenter.lat, selectedCenter.lng], {
+                icon: L.divIcon({
+                    className: 'center-marker',
+                    html: '<div style="background: #ff5722; width: 12px; height: 12px; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.3);"></div>',
+                    iconSize: [12, 12],
+                    iconAnchor: [6, 6]
+                })
             }).addTo(map);
         }
 
@@ -898,9 +1049,14 @@
             questionMarkers = [];
             score = 0;
             currentHeading = 0;
+            selectedCenter = null;
             if (map) {
                 map.remove();
                 map = null;
+            }
+            if (selectorMap) {
+                selectorMap.remove();
+                selectorMap = null;
             }
             showScreen('setup-screen');
             getUserLocation();
@@ -908,7 +1064,7 @@
 
         // Show specific screen
         function showScreen(screenClass) {
-            document.querySelectorAll('.setup-screen, .map-screen, .question-screen, .results-screen').forEach(screen => {
+            document.querySelectorAll('.setup-screen, .map-selector-screen, .map-screen, .question-screen, .results-screen').forEach(screen => {
                 screen.classList.remove('active');
             });
             document.querySelector(`.${screenClass}`).classList.add('active');
@@ -916,4 +1072,3 @@
     </script>
 </body>
 </html>
-
