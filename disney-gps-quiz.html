@@ -517,7 +517,7 @@
         let timerMinutes = 30;
         let timerInterval = null;
         let timeLeft = 0;
-        const UNLOCK_DISTANCE = 50; // meters
+        const UNLOCK_DISTANCE = 30; // meters
 
         // Disney cartoon quiz questions pool in Russian
         const questionPool = [
@@ -1875,7 +1875,13 @@
             stopTimer();
             
             const answeredCount = questions.filter(q => q.answered).length;
+            const totalQuestions = questions.length;
+            
             document.getElementById('finalScore').textContent = `${score}/${answeredCount}`;
+            
+            // Add answered/total display
+            const scoreText = document.querySelector('.score-text');
+            scoreText.innerHTML = `Правильных ответов<br><span style="font-size: 14px; color: #999;">Отвечено: ${answeredCount} из ${totalQuestions} вопросов</span>`;
             
             let feedback = '';
             if (answeredCount === 0) {
@@ -1891,6 +1897,12 @@
                     feedback = "Хорошо! Продолжайте смотреть классику! 🎬";
                 } else {
                     feedback = "Неплохо! Время для марафона Disney! 🍿";
+                }
+                
+                // Add note if not all questions were answered
+                if (answeredCount < totalQuestions) {
+                    const unanswered = totalQuestions - answeredCount;
+                    feedback += `\n\nВы не успели ответить на ${unanswered} ${unanswered === 1 ? 'вопрос' : unanswered < 5 ? 'вопроса' : 'вопросов'}.`;
                 }
             }
             
