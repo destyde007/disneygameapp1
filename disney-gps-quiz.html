@@ -441,7 +441,7 @@
                 <div id="timerDisplay" style="display: none; background: #fff3cd; padding: 10px; border-radius: 8px; margin-bottom: 10px; text-align: center; font-weight: 600; color: #856404;">
                     ⏱️ Осталось времени: <span id="timeRemaining">30:00</span>
                 </div>
-                <div style="font-size: 14px; color: #666; margin-bottom: 10px;">Подойдите к вопросу на расстояние 15м, чтобы разблокировать его</div>
+                <div style="font-size: 14px; color: #666; margin-bottom: 10px;">Подойдите к вопросу на расстояние 20м, чтобы разблокировать его</div>
                 
                 <div class="map-legend">
                     <div class="legend-item">
@@ -517,7 +517,7 @@
         let timerMinutes = 30;
         let timerInterval = null;
         let timeLeft = 0;
-        const UNLOCK_DISTANCE = 30; // meters
+        const UNLOCK_DISTANCE = 20; // meters
 
         // Disney cartoon quiz questions pool in Russian
         const questionPool = [
@@ -1751,61 +1751,62 @@
             return shuffled.slice(0, count).map(q => ({...q}));
         }
 
-        // Generate random location within radius or drawn shape
+        // Check if a point is inside a polygon using ray casting algorithm
+        function isPointInPolygon(point, polygonLatLngs) {
+            const x = point.lat;
+            const y = point.lng;
+            let inside = false;
+
+            for (let i = 0, j = polygonLatLngs.length - 1; i < polygonLatLngs.length; j = i++) {
+                const xi = polygonLatLngs[i].lat, yi = polygonLatLngs[i].lng;
+                const xj = polygonLatLngs[j].lat, yj = polygonLatLngs[j].lng;
+
+                const intersect = ((yi > y) !== (yj > y)) &&
+                    (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+                if (intersect) inside = !inside;
+            }
+            return inside;
+        }
+
+        // Generate random location strictly within the drawn polygon
         function getRandomLocationInRadius(center, radiusInMeters) {
             if (!drawnShape) {
-                // Fallback to circle if no shape drawn
-                radiusInMeters = 500;
-            }
-            
-            // Get bounds of the drawn shape
-            const bounds = drawnShape ? drawnShape.getBounds() : null;
-            
-            if (bounds) {
-                // Generate random point within bounds
-                let point;
-                let attempts = 0;
-                const maxAttempts = 100;
-                
-                do {
-                    const lat = bounds.getSouth() + Math.random() * (bounds.getNorth() - bounds.getSouth());
-                    const lng = bounds.getWest() + Math.random() * (bounds.getEast() - bounds.getWest());
-                    point = L.latLng(lat, lng);
-                    attempts++;
-                    
-                    // Check if point is inside the shape
-                    if (currentDrawingTool === 'circle') {
-                        const distance = center.distanceTo ? 
-                            L.latLng(center).distanceTo(point) : 
-                            L.latLng(center.lat, center.lng).distanceTo(point);
-                        if (distance <= drawnShape.getRadius()) {
-                            return {lat: point.lat, lng: point.lng};
-                        }
-                    } else {
-                        // For rectangle and polygon, check if point is in bounds
-                        // Simple bounds check for rectangle/polygon
-                        return {lat: point.lat, lng: point.lng};
-                    }
-                } while (attempts < maxAttempts);
-                
-                // Fallback to center if couldn't find point
-                return {lat: center.lat, lng: center.lng};
-            } else {
-                // Original circle logic as fallback
-                const radiusInDegrees = radiusInMeters / 111320;
-                
+                // Fallback to simple circle around center
+                const radiusInDegrees = 500 / 111320;
                 const u = Math.random();
                 const v = Math.random();
                 const w = radiusInDegrees * Math.sqrt(u);
                 const t = 2 * Math.PI * v;
-                const x = w * Math.cos(t);
-                const y = w * Math.sin(t);
-                
                 return {
-                    lat: center.lat + y,
-                    lng: center.lng + x / Math.cos(center.lat * Math.PI / 180)
+                    lat: center.lat + w * Math.cos(t),
+                    lng: center.lng + w * Math.sin(t) / Math.cos(center.lat * Math.PI / 180)
                 };
             }
+
+            const bounds = drawnShape.getBounds();
+            const polygonLatLngs = drawnShape.getLatLngs()[0];
+
+            const south = bounds.getSouth();
+            const north = bounds.getNorth();
+            const west = bounds.getWest();
+            const east = bounds.getEast();
+
+            let attempts = 0;
+            const maxAttempts = 500;
+
+            while (attempts < maxAttempts) {
+                const lat = south + Math.random() * (north - south);
+                const lng = west + Math.random() * (east - west);
+                const candidate = L.latLng(lat, lng);
+
+                if (isPointInPolygon(candidate, polygonLatLngs)) {
+                    return { lat, lng };
+                }
+                attempts++;
+            }
+
+            // Last resort: return the center of the polygon
+            return { lat: center.lat, lng: center.lng };
         }
 
         // Calculate distance between two points
