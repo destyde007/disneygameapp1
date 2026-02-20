@@ -368,16 +368,8 @@
             </div>
             
             <div class="input-group">
-                <label for="questionCount">Количество вопросов (1-15)</label>
-                <input type="number" id="questionCount" min="1" max="15" value="5" placeholder="Введите количество вопросов">
-            </div>
-
-            <div class="input-group">
-                <label for="mapStyle">Стиль карты</label>
-                <select id="mapStyle" style="width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 10px; font-size: 16px; background: white;">
-                    <option value="street">Обычная карта</option>
-                    <option value="satellite">Спутник</option>
-                </select>
+                <label for="questionCount">Количество заданий (1-20)</label>
+                <input type="number" id="questionCount" min="1" max="20" value="10" placeholder="Введите количество заданий">
             </div>
 
             <div class="input-group">
@@ -1402,7 +1394,7 @@
         // Show map selector screen
         function showMapSelector() {
             questionCount = parseInt(document.getElementById('questionCount').value);
-            mapStyle = document.getElementById('mapStyle').value;
+            mapStyle = 'street'; // Always use street map
             
             if (timerEnabled) {
                 timerMinutes = parseInt(document.getElementById('timerMinutes').value);
@@ -1413,8 +1405,8 @@
                 return;
             }
 
-            if (questionCount < 1 || questionCount > 15) {
-                alert('Пожалуйста, введите количество вопросов от 1 до 15');
+            if (questionCount < 1 || questionCount > 20) {
+                alert('Пожалуйста, введите количество заданий от 1 до 20');
                 return;
             }
 
@@ -1607,8 +1599,8 @@
                 selectedCenter = {lat: userLocation.lat, lng: userLocation.lng};
             }
 
-            // Mix questions and challenges (70% questions, 30% challenges)
-            const numQuestions = Math.ceil(questionCount * 0.7);
+            // Mix questions and challenges (50% questions, 50% challenges)
+            const numQuestions = Math.ceil(questionCount * 0.5);
             const numChallenges = questionCount - numQuestions;
             
             // Get random questions
