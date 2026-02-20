@@ -456,6 +456,10 @@
                         <div class="legend-dot answered"></div>
                         <span>Отвечен</span>
                     </div>
+                    <div class="legend-item">
+                        <div class="legend-dot" style="background: #ff9800;"></div>
+                        <span>Пропущен</span>
+                    </div>
                 </div>
             </div>
             
@@ -517,7 +521,7 @@
         let timerMinutes = 30;
         let timerInterval = null;
         let timeLeft = 0;
-        const UNLOCK_DISTANCE = 20; // meters
+        const UNLOCK_DISTANCE =20; // meters
 
         // Disney cartoon quiz questions pool in Russian
         const questionPool = [
@@ -1649,7 +1653,17 @@
         // Update marker color
         function updateMarkerColor(index) {
             const q = questions[index];
-            const color = q.answered ? '#2196f3' : (q.unlocked ? '#4caf50' : '#f44336');
+            let color;
+            
+            if (q.skipped) {
+                color = '#ff9800'; // Orange for skipped
+            } else if (q.answered) {
+                color = '#2196f3'; // Blue for answered
+            } else if (q.unlocked) {
+                color = '#4caf50'; // Green for unlocked
+            } else {
+                color = '#f44336'; // Red for locked
+            }
             
             if (questionMarkers[index]) {
                 questionMarkers[index].setIcon(L.divIcon({
@@ -1670,11 +1684,97 @@
             }
 
             if (!q.unlocked) {
-                alert(`Подойдите ближе! Расстояние до вопроса: ${q.distance.toFixed(1)}м (нужно: ${UNLOCK_DISTANCE}м)`);
+                showQuestionOptions(index);
                 return;
             }
 
             showQuestion(index);
+        }
+
+        // Show options for locked question
+        function showQuestionOptions(index) {
+            const q = questions[index];
+            const distance = q.distance.toFixed(1);
+            
+            const message = `Вопрос ${index + 1} заблокирован\n\nРасстояние: ${distance}м (нужно: ${UNLOCK_DISTANCE}м)\n\nЧто вы хотите сделать?`;
+            
+            // Create custom dialog with options
+            const dialog = document.createElement('div');
+            dialog.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: rgba(0,0,0,0.7);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                z-index: 10000;
+            `;
+            
+            dialog.innerHTML = `
+                <div style="background: white; border-radius: 20px; padding: 30px; max-width: 400px; width: 90%; box-shadow: 0 20px 60px rgba(0,0,0,0.3);">
+                    <h3 style="color: #667eea; margin-bottom: 15px; text-align: center;">Вопрос ${index + 1} заблокирован 🔒</h3>
+                    <p style="text-align: center; margin-bottom: 20px; color: #666;">
+                        Расстояние: <strong>${distance}м</strong> (нужно: ${UNLOCK_DISTANCE}м)
+                    </p>
+                    <button onclick="skipQuestion(${index})" style="width: 100%; padding: 15px; margin-bottom: 10px; background: #ff9800; color: white; border: none; border-radius: 10px; font-size: 16px; font-weight: 600; cursor: pointer;">
+                        ⏭️ Пропустить вопрос
+                    </button>
+                    <button onclick="relocateQuestion(${index})" style="width: 100%; padding: 15px; margin-bottom: 10px; background: #2196f3; color: white; border: none; border-radius: 10px; font-size: 16px; font-weight: 600; cursor: pointer;">
+                        📍 Переместить в новое место
+                    </button>
+                    <button onclick="closeQuestionDialog()" style="width: 100%; padding: 15px; background: #6c757d; color: white; border: none; border-radius: 10px; font-size: 16px; font-weight: 600; cursor: pointer;">
+                        ❌ Отмена
+                    </button>
+                </div>
+            `;
+            
+            dialog.id = 'questionDialog';
+            document.body.appendChild(dialog);
+        }
+
+        // Close question options dialog
+        function closeQuestionDialog() {
+            const dialog = document.getElementById('questionDialog');
+            if (dialog) {
+                dialog.remove();
+            }
+        }
+
+        // Skip question
+        function skipQuestion(index) {
+            const q = questions[index];
+            q.skipped = true;
+            q.answered = true; // Mark as "answered" so it can't be clicked again
+            
+            // Update marker to show it's skipped
+            updateMarkerColor(index);
+            
+            closeQuestionDialog();
+            
+            alert(`Вопрос ${index + 1} пропущен`);
+        }
+
+        // Relocate question to new random location
+        function relocateQuestion(index) {
+            const q = questions[index];
+            
+            // Generate new location
+            q.location = getRandomLocationInRadius(selectedCenter, radius);
+            q.distance = calculateDistance(userLocation, q.location);
+            q.unlocked = q.distance <= UNLOCK_DISTANCE;
+            
+            // Update marker position
+            if (questionMarkers[index]) {
+                questionMarkers[index].setLatLng([q.location.lat, q.location.lng]);
+                updateMarkerColor(index);
+            }
+            
+            closeQuestionDialog();
+            
+            alert(`Вопрос ${index + 1} перемещён в новое место!\nНовое расстояние: ${q.distance.toFixed(1)}м`);
         }
 
         // Show question screen
@@ -1875,14 +1975,20 @@
             stopCompassTracking();
             stopTimer();
             
-            const answeredCount = questions.filter(q => q.answered).length;
+            const answeredCount = questions.filter(q => q.answered && !q.skipped).length;
+            const skippedCount = questions.filter(q => q.skipped).length;
             const totalQuestions = questions.length;
             
             document.getElementById('finalScore').textContent = `${score}/${answeredCount}`;
             
             // Add answered/total display
             const scoreText = document.querySelector('.score-text');
-            scoreText.innerHTML = `Правильных ответов<br><span style="font-size: 14px; color: #999;">Отвечено: ${answeredCount} из ${totalQuestions} вопросов</span>`;
+            let statusText = `Правильных ответов<br><span style="font-size: 14px; color: #999;">Отвечено: ${answeredCount} из ${totalQuestions} вопросов`;
+            if (skippedCount > 0) {
+                statusText += `<br>Пропущено: ${skippedCount}`;
+            }
+            statusText += `</span>`;
+            scoreText.innerHTML = statusText;
             
             let feedback = '';
             if (answeredCount === 0) {
@@ -1901,9 +2007,12 @@
                 }
                 
                 // Add note if not all questions were answered
-                if (answeredCount < totalQuestions) {
-                    const unanswered = totalQuestions - answeredCount;
-                    feedback += `\n\nВы не успели ответить на ${unanswered} ${unanswered === 1 ? 'вопрос' : unanswered < 5 ? 'вопроса' : 'вопросов'}.`;
+                const unansweredCount = totalQuestions - answeredCount - skippedCount;
+                if (unansweredCount > 0) {
+                    feedback += `\n\nВы не успели ответить на ${unansweredCount} ${unansweredCount === 1 ? 'вопрос' : unansweredCount < 5 ? 'вопроса' : 'вопросов'}.`;
+                }
+                if (skippedCount > 0) {
+                    feedback += `\nПропущено вопросов: ${skippedCount}.`;
                 }
             }
             
@@ -1914,7 +2023,7 @@
             resultsList.innerHTML = '<h3 style="margin-bottom: 15px;">Ваши ответы:</h3>';
             
             questions.forEach((q, index) => {
-                if (q.answered) {
+                if (q.answered && !q.skipped) {
                     const isCorrect = q.userAnswer === q.correct;
                     const resultItem = document.createElement('div');
                     resultItem.className = `result-item ${isCorrect ? 'correct' : 'incorrect'}`;
@@ -1923,6 +2032,17 @@
                         <div class="result-answer">
                             Ваш ответ: ${q.options[q.userAnswer]} ${isCorrect ? '✓' : '✗'}<br>
                             ${!isCorrect ? `Правильный ответ: ${q.options[q.correct]}` : ''}
+                        </div>
+                    `;
+                    resultsList.appendChild(resultItem);
+                } else if (q.skipped) {
+                    const resultItem = document.createElement('div');
+                    resultItem.className = 'result-item';
+                    resultItem.style.borderLeft = '4px solid #ff9800';
+                    resultItem.innerHTML = `
+                        <div class="result-question">${index + 1}. ${q.question}</div>
+                        <div class="result-answer" style="color: #ff9800;">
+                            ⏭️ Вопрос пропущен
                         </div>
                     `;
                     resultsList.appendChild(resultItem);
