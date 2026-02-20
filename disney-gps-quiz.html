@@ -441,6 +441,9 @@
                 <div id="timerDisplay" style="display: none; background: #fff3cd; padding: 10px; border-radius: 8px; margin-bottom: 10px; text-align: center; font-weight: 600; color: #856404;">
                     ⏱️ Осталось времени: <span id="timeRemaining">30:00</span>
                 </div>
+                <div id="starCounter" style="background: linear-gradient(135deg, #ffd700 0%, #ffed4e 100%); padding: 10px; border-radius: 8px; margin-bottom: 10px; text-align: center; font-weight: 600; color: #ff6b00; box-shadow: 0 3px 10px rgba(255,215,0,0.3);">
+                    ⭐ Звёзды: <span id="starsCount">0</span>/<span id="totalStarsCount">0</span>
+                </div>
                 <div style="font-size: 14px; color: #666; margin-bottom: 10px;">Подойдите к вопросу на расстояние 20м, чтобы разблокировать его</div>
                 
                 <div class="map-legend">
@@ -521,7 +524,133 @@
         let timerMinutes = 30;
         let timerInterval = null;
         let timeLeft = 0;
-        const UNLOCK_DISTANCE =20; // meters
+        let starsCollected = 0;
+        let totalStars = 0;
+        const UNLOCK_DISTANCE = 20; // meters
+
+        // Challenge pool - physical and creative activities
+        const challengePool = [
+            {
+                type: 'physical',
+                challenge: "Попрыгай на одной ноге 10 раз!",
+                icon: "🦘",
+                image: "https://images.unsplash.com/photo-1587731556938-38755b4803a6?w=800&auto=format&fit=crop"
+            },
+            {
+                type: 'physical',
+                challenge: "Покружись вокруг себя 5 раз!",
+                icon: "🌀",
+                image: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=800&auto=format&fit=crop"
+            },
+            {
+                type: 'physical',
+                challenge: "Сделай 5 прыжков как лягушка!",
+                icon: "🐸",
+                image: "https://images.unsplash.com/photo-1535930891776-0c2dfb7fda1a?w=800&auto=format&fit=crop"
+            },
+            {
+                type: 'physical',
+                challenge: "Дотронься до носочков 10 раз!",
+                icon: "🤸",
+                image: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=800&auto=format&fit=crop"
+            },
+            {
+                type: 'physical',
+                challenge: "Помаши руками как птица 10 секунд!",
+                icon: "🦅",
+                image: "https://images.unsplash.com/photo-1535930891776-0c2dfb7fda1a?w=800&auto=format&fit=crop"
+            },
+            {
+                type: 'physical',
+                challenge: "Походи как медведь 20 шагов!",
+                icon: "🐻",
+                image: "https://images.unsplash.com/photo-1589656966895-2f33e7653819?w=800&auto=format&fit=crop"
+            },
+            {
+                type: 'physical',
+                challenge: "Сделай 10 прыжков звездой!",
+                icon: "⭐",
+                image: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=800&auto=format&fit=crop"
+            },
+            {
+                type: 'physical',
+                challenge: "Постой на одной ноге 15 секунд!",
+                icon: "🦩",
+                image: "https://images.unsplash.com/photo-1535930891776-0c2dfb7fda1a?w=800&auto=format&fit=crop"
+            },
+            {
+                type: 'creative',
+                challenge: "Спой свою любимую песню из Disney!",
+                icon: "🎤",
+                image: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=800&auto=format&fit=crop"
+            },
+            {
+                type: 'creative',
+                challenge: "Покажи, как ходит Эльза!",
+                icon: "👸",
+                image: "https://images.unsplash.com/photo-1483381719261-1d7f82f8c364?w=800&auto=format&fit=crop"
+            },
+            {
+                type: 'creative',
+                challenge: "Изобрази львёнка Симбу!",
+                icon: "🦁",
+                image: "https://images.unsplash.com/photo-1556103255-4443dbae8e5a?w=800&auto=format&fit=crop"
+            },
+            {
+                type: 'creative',
+                challenge: "Скажи 'Я люблю Disney!' смешным голосом!",
+                icon: "🗣️",
+                image: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=800&auto=format&fit=crop"
+            },
+            {
+                type: 'creative',
+                challenge: "Нарисуй смайлик в воздухе пальцем!",
+                icon: "🎨",
+                image: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=800&auto=format&fit=crop"
+            },
+            {
+                type: 'search',
+                challenge: "Найди что-нибудь жёлтое рядом!",
+                icon: "🔍",
+                image: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=800&auto=format&fit=crop"
+            },
+            {
+                type: 'search',
+                challenge: "Найди что-нибудь красное рядом!",
+                icon: "🔍",
+                image: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=800&auto=format&fit=crop"
+            },
+            {
+                type: 'search',
+                challenge: "Собери 3 листочка!",
+                icon: "🍃",
+                image: "https://images.unsplash.com/photo-1589656966895-2f33e7653819?w=800&auto=format&fit=crop"
+            },
+            {
+                type: 'brain',
+                challenge: "Назови 3 принцесс Disney!",
+                icon: "🧠",
+                image: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=800&auto=format&fit=crop"
+            },
+            {
+                type: 'brain',
+                challenge: "Назови 3 животных из мультиков Disney!",
+                icon: "🧠",
+                image: "https://images.unsplash.com/photo-1535930891776-0c2dfb7fda1a?w=800&auto=format&fit=crop"
+            },
+            {
+                type: 'brain',
+                challenge: "Посчитай от 10 до 1 в обратном порядке!",
+                icon: "🔢",
+                image: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=800&auto=format&fit=crop"
+            },
+            {
+                type: 'creative',
+                challenge: "Притворись, что ты русалка Ариэль!",
+                icon: "🧜‍♀️",
+                image: "https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=800&auto=format&fit=crop"
+            }
+        ];
 
         // Disney cartoon quiz questions pool in Russian
         const questionPool = [
@@ -1478,10 +1607,26 @@
                 selectedCenter = {lat: userLocation.lat, lng: userLocation.lng};
             }
 
-            // Select random questions
-            questions = getRandomQuestions(questionCount);
+            // Mix questions and challenges (70% questions, 30% challenges)
+            const numQuestions = Math.ceil(questionCount * 0.7);
+            const numChallenges = questionCount - numQuestions;
             
-            // Assign random locations to questions within the selected area
+            // Get random questions
+            const selectedQuestions = getRandomQuestions(numQuestions).map(q => ({
+                ...q,
+                itemType: 'question'
+            }));
+            
+            // Get random challenges
+            const selectedChallenges = getRandomChallenges(numChallenges).map(c => ({
+                ...c,
+                itemType: 'challenge'
+            }));
+            
+            // Combine and shuffle
+            questions = [...selectedQuestions, ...selectedChallenges].sort(() => Math.random() - 0.5);
+            
+            // Assign random locations to all items
             questions.forEach((q, index) => {
                 q.id = index;
                 q.location = getRandomLocationInRadius(selectedCenter, radius);
@@ -1492,6 +1637,8 @@
             });
 
             score = 0;
+            starsCollected = 0;
+            totalStars = questionCount; // Each item gives 1 star
 
             // Clean up selector map
             if (selectorMap) {
@@ -1503,6 +1650,10 @@
             initMap();
             startLocationTracking();
             startCompassTracking();
+            
+            // Update star counter
+            document.getElementById('starsCount').textContent = starsCollected;
+            document.getElementById('totalStarsCount').textContent = totalStars;
             
             // Start timer if enabled
             if (timerEnabled) {
@@ -1779,33 +1930,102 @@
 
         // Show question screen
         function showQuestion(index) {
-            const q = questions[index];
+            const item = questions[index];
             
             document.getElementById('proximityStatus').innerHTML = `
                 <div class="proximity-ok">
-                    ✅ Вопрос ${index + 1} разблокирован! Расстояние: ${q.distance.toFixed(1)}м
+                    ✅ ${item.itemType === 'challenge' ? 'Задание' : 'Вопрос'} ${index + 1} разблокирован! Расстояние: ${item.distance.toFixed(1)}м
                 </div>
             `;
             
-            // Create question card with image
             const questionCard = document.querySelector('.question-card');
-            questionCard.innerHTML = `
-                <img src="${q.image}" alt="Вопрос ${index + 1}" class="question-image" onerror="this.style.display='none'">
-                <div class="question-text">${q.question}</div>
-                <div class="options" id="optionsContainer"></div>
-            `;
             
-            const optionsContainer = document.getElementById('optionsContainer');
-            
-            q.options.forEach((option, optIndex) => {
-                const optionDiv = document.createElement('div');
-                optionDiv.className = 'option';
-                optionDiv.textContent = option;
-                optionDiv.onclick = () => selectAnswer(index, optIndex);
-                optionsContainer.appendChild(optionDiv);
-            });
+            if (item.itemType === 'challenge') {
+                // Show challenge
+                questionCard.innerHTML = `
+                    <img src="${item.image}" alt="Задание ${index + 1}" class="question-image" onerror="this.style.display='none'">
+                    <div style="text-align: center; font-size: 48px; margin-bottom: 15px;">${item.icon}</div>
+                    <div class="question-text" style="text-align: center; color: #ff9800;">${item.challenge}</div>
+                    <div style="text-align: center; margin-top: 25px;">
+                        <button onclick="completeChallenge(${index}, true)" style="padding: 15px 30px; margin: 10px; background: #4caf50; color: white; border: none; border-radius: 10px; font-size: 18px; font-weight: 600; cursor: pointer;">
+                            ✅ Выполнила!
+                        </button>
+                        <button onclick="completeChallenge(${index}, false)" style="padding: 15px 30px; margin: 10px; background: #f44336; color: white; border: none; border-radius: 10px; font-size: 18px; font-weight: 600; cursor: pointer;">
+                            ❌ Не получилось
+                        </button>
+                    </div>
+                `;
+            } else {
+                // Show question
+                questionCard.innerHTML = `
+                    <img src="${item.image}" alt="Вопрос ${index + 1}" class="question-image" onerror="this.style.display='none'">
+                    <div class="question-text">${item.question}</div>
+                    <div class="options" id="optionsContainer"></div>
+                `;
+                
+                const optionsContainer = document.getElementById('optionsContainer');
+                
+                item.options.forEach((option, optIndex) => {
+                    const optionDiv = document.createElement('div');
+                    optionDiv.className = 'option';
+                    optionDiv.textContent = option;
+                    optionDiv.onclick = () => selectAnswer(index, optIndex);
+                    optionsContainer.appendChild(optionDiv);
+                });
+            }
 
             showScreen('question-screen');
+        }
+
+        // Complete challenge
+        function completeChallenge(index, success) {
+            const challenge = questions[index];
+            challenge.answered = true;
+            challenge.userAnswer = success;
+            
+            if (success) {
+                score++;
+                starsCollected++;
+                showStarAnimation();
+            }
+            
+            updateMarkerColor(index);
+            
+            setTimeout(() => {
+                backToMap();
+            }, success ? 1500 : 1000);
+        }
+
+        // Show star collection animation
+        function showStarAnimation() {
+            const star = document.createElement('div');
+            star.innerHTML = '⭐';
+            star.style.cssText = `
+                position: fixed;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                font-size: 100px;
+                z-index: 10000;
+                animation: collectStar 1.5s ease-out forwards;
+            `;
+            
+            const style = document.createElement('style');
+            style.textContent = `
+                @keyframes collectStar {
+                    0% { transform: translate(-50%, -50%) scale(0); opacity: 1; }
+                    50% { transform: translate(-50%, -50%) scale(1.2); opacity: 1; }
+                    100% { transform: translate(-50%, -150%) scale(0.5); opacity: 0; }
+                }
+            `;
+            
+            document.head.appendChild(style);
+            document.body.appendChild(star);
+            
+            setTimeout(() => {
+                star.remove();
+                style.remove();
+            }, 1500);
         }
 
         // Handle answer selection
@@ -1825,6 +2045,8 @@
                 options[selectedIndex].classList.add('incorrect');
             } else {
                 score++;
+                starsCollected++;
+                showStarAnimation();
             }
 
             // Store answer
@@ -1842,6 +2064,8 @@
 
         // Back to map
         function backToMap() {
+            // Update star counter
+            document.getElementById('starsCount').textContent = starsCollected;
             showScreen('map-screen');
         }
 
@@ -1849,6 +2073,12 @@
         function getRandomQuestions(count) {
             const shuffled = [...questionPool].sort(() => Math.random() - 0.5);
             return shuffled.slice(0, count).map(q => ({...q}));
+        }
+
+        // Get random challenges from pool
+        function getRandomChallenges(count) {
+            const shuffled = [...challengePool].sort(() => Math.random() - 0.5);
+            return shuffled.slice(0, count).map(c => ({...c}));
         }
 
         // Check if a point is inside a polygon using ray casting algorithm
@@ -1979,11 +2209,37 @@
             const skippedCount = questions.filter(q => q.skipped).length;
             const totalQuestions = questions.length;
             
-            document.getElementById('finalScore').textContent = `${score}/${answeredCount}`;
+            // Calculate badge/achievement
+            let badge = '';
+            let badgeEmoji = '';
+            const starPercentage = (starsCollected / totalStars) * 100;
             
-            // Add answered/total display
+            if (starPercentage === 100) {
+                badge = 'МАСТЕР DISNEY!';
+                badgeEmoji = '🏆';
+            } else if (starPercentage >= 80) {
+                badge = 'СУПЕР ЗВЕЗДА!';
+                badgeEmoji = '🌟';
+            } else if (starPercentage >= 60) {
+                badge = 'ОТЛИЧНО!';
+                badgeEmoji = '⭐';
+            } else if (starPercentage >= 40) {
+                badge = 'МОЛОДЕЦ!';
+                badgeEmoji = '🎯';
+            } else {
+                badge = 'ХОРОШАЯ ПОПЫТКА!';
+                badgeEmoji = '🎮';
+            }
+            
+            document.getElementById('finalScore').innerHTML = `
+                <div style="font-size: 60px; margin-bottom: 10px;">${badgeEmoji}</div>
+                <div style="font-size: 32px; color: #667eea; margin-bottom: 15px;">${badge}</div>
+                <div style="font-size: 48px; color: #ffd700;">⭐ ${starsCollected}/${totalStars}</div>
+            `;
+            
+            // Update score text
             const scoreText = document.querySelector('.score-text');
-            let statusText = `Правильных ответов<br><span style="font-size: 14px; color: #999;">Отвечено: ${answeredCount} из ${totalQuestions} вопросов`;
+            let statusText = `Собрано звёзд<br><span style="font-size: 14px; color: #999;">Отвечено: ${answeredCount} из ${totalQuestions}`;
             if (skippedCount > 0) {
                 statusText += `<br>Пропущено: ${skippedCount}`;
             }
@@ -1992,27 +2248,25 @@
             
             let feedback = '';
             if (answeredCount === 0) {
-                feedback = "Вы не ответили ни на один вопрос! Попробуйте снова! 🎮";
+                feedback = "Попробуй ещё раз! Ты сможешь! 🎮";
             } else {
-                const percentage = (score / answeredCount) * 100;
-                
-                if (percentage === 100) {
-                    feedback = "Идеально! Вы настоящий эксперт Disney! 🌟";
-                } else if (percentage >= 80) {
-                    feedback = "Отлично! Вы знаете Disney! 🎊";
-                } else if (percentage >= 60) {
-                    feedback = "Хорошо! Продолжайте смотреть классику! 🎬";
+                if (starPercentage === 100) {
+                    feedback = "УРА! Ты собрала все звёзды! Ты настоящая чемпионка! 🎉🎊";
+                } else if (starPercentage >= 80) {
+                    feedback = "Отличная работа! Ты почти собрала все звёзды! 🌟";
+                } else if (starPercentage >= 60) {
+                    feedback = "Хорошо! Продолжай в том же духе! 🎬";
                 } else {
-                    feedback = "Неплохо! Время для марафона Disney! 🍿";
+                    feedback = "Неплохо! В следующий раз получится ещё лучше! 🍿";
                 }
                 
                 // Add note if not all questions were answered
                 const unansweredCount = totalQuestions - answeredCount - skippedCount;
                 if (unansweredCount > 0) {
-                    feedback += `\n\nВы не успели ответить на ${unansweredCount} ${unansweredCount === 1 ? 'вопрос' : unansweredCount < 5 ? 'вопроса' : 'вопросов'}.`;
+                    feedback += `\n\nНе успела: ${unansweredCount} ${unansweredCount === 1 ? 'задание' : unansweredCount < 5 ? 'задания' : 'заданий'}.`;
                 }
                 if (skippedCount > 0) {
-                    feedback += `\nПропущено вопросов: ${skippedCount}.`;
+                    feedback += `\nПропущено: ${skippedCount}.`;
                 }
             }
             
@@ -2020,29 +2274,45 @@
             
             // Show detailed results
             const resultsList = document.getElementById('resultsList');
-            resultsList.innerHTML = '<h3 style="margin-bottom: 15px;">Ваши ответы:</h3>';
+            resultsList.innerHTML = '<h3 style="margin-bottom: 15px;">Твои результаты:</h3>';
             
-            questions.forEach((q, index) => {
-                if (q.answered && !q.skipped) {
-                    const isCorrect = q.userAnswer === q.correct;
+            questions.forEach((item, index) => {
+                if (item.answered && !item.skipped) {
                     const resultItem = document.createElement('div');
-                    resultItem.className = `result-item ${isCorrect ? 'correct' : 'incorrect'}`;
-                    resultItem.innerHTML = `
-                        <div class="result-question">${index + 1}. ${q.question}</div>
-                        <div class="result-answer">
-                            Ваш ответ: ${q.options[q.userAnswer]} ${isCorrect ? '✓' : '✗'}<br>
-                            ${!isCorrect ? `Правильный ответ: ${q.options[q.correct]}` : ''}
-                        </div>
-                    `;
+                    
+                    if (item.itemType === 'challenge') {
+                        // Show challenge result
+                        const success = item.userAnswer === true;
+                        resultItem.className = `result-item ${success ? 'correct' : 'incorrect'}`;
+                        resultItem.innerHTML = `
+                            <div style="font-size: 32px; text-align: center; margin-bottom: 10px;">${item.icon}</div>
+                            <div class="result-question">${index + 1}. ${item.challenge}</div>
+                            <div class="result-answer">
+                                ${success ? '✅ Выполнено! ⭐' : '❌ Не получилось'}
+                            </div>
+                        `;
+                    } else {
+                        // Show question result
+                        const isCorrect = item.userAnswer === item.correct;
+                        resultItem.className = `result-item ${isCorrect ? 'correct' : 'incorrect'}`;
+                        resultItem.innerHTML = `
+                            <div class="result-question">${index + 1}. ${item.question}</div>
+                            <div class="result-answer">
+                                Ответ: ${item.options[item.userAnswer]} ${isCorrect ? '✓ ⭐' : '✗'}<br>
+                                ${!isCorrect ? `Правильно: ${item.options[item.correct]}` : ''}
+                            </div>
+                        `;
+                    }
                     resultsList.appendChild(resultItem);
-                } else if (q.skipped) {
+                } else if (item.skipped) {
                     const resultItem = document.createElement('div');
                     resultItem.className = 'result-item';
                     resultItem.style.borderLeft = '4px solid #ff9800';
+                    const text = item.itemType === 'challenge' ? item.challenge : item.question;
                     resultItem.innerHTML = `
-                        <div class="result-question">${index + 1}. ${q.question}</div>
+                        <div class="result-question">${index + 1}. ${text}</div>
                         <div class="result-answer" style="color: #ff9800;">
-                            ⏭️ Вопрос пропущен
+                            ⏭️ Пропущено
                         </div>
                     `;
                     resultsList.appendChild(resultItem);
@@ -2060,6 +2330,8 @@
             questions = [];
             questionMarkers = [];
             score = 0;
+            starsCollected = 0;
+            totalStars = 0;
             currentHeading = 0;
             selectedCenter = null;
             timerEnabled = false;
